@@ -11,6 +11,8 @@ One paragraph: the problem, why it matters, what this plan changes. Replace in e
 
 ## 1. How To Use This Template
 
+**Repo layout:** `~/code` holds all repos, one directory per repo (this template lives in `~/code/misc`). Plans reference paths relative to their own repo root.
+
 Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below is numbered and **stays in every fork** — never delete one, so the order is absolute. If a section doesn't apply, write `not applicable` plus one line why. **Postmortems is second-to-last and Project History last** — attention on a long doc is U-shaped, so the end stays high-attention; this keeps lessons salient without cluttering the top.
 
 1. How To Use This Template
@@ -20,8 +22,8 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 5. Execution Steps
 6. Out of Scope / Non-Goals
 7. Architecture
-8. Data Snippets — *if relevant*
-9. Implementation Details
+8. Implementation Details
+9. Data Snippets — *if relevant*
 10. Open Questions / Decisions Needed
 11. Test Plan / Acceptance Criteria
 12. References / Links
@@ -94,7 +96,18 @@ How the pieces fit: components, data flow, key interfaces, where this plugs in. 
 
 ---
 
-## 8. Data Snippets
+## 8. Implementation Details
+
+Spell out **every key algorithm, loop, and transformation step by step** as a numbered list, in succinct plain English — concrete enough to execute without re-deriving the design. Prefer clear English > pseudocode > code; use code only to name the heavy-lifting library/call (e.g. `torch.nn.functional.scaled_dot_product_attention`, `fast-xml-parser`). One numbered list per algorithm, under a short bold label.
+
+**<name of the algorithm/loop>**
+
+1. ...
+2. ...
+
+---
+
+## 9. Data Snippets
 
 *(if relevant — otherwise `not applicable`)*
 
@@ -103,17 +116,6 @@ Ground the work in real shapes. **Include 3 examples** of whatever is central �
 ```json
 { "example": "replace with a real payload central to this work" }
 ```
-
----
-
-## 9. Implementation Details
-
-Spell out **every key algorithm, loop, and transformation step by step** as a numbered list, in succinct plain English — concrete enough to execute without re-deriving the design. Prefer clear English > pseudocode > code; use code only to name the heavy-lifting library/call (e.g. `torch.nn.functional.scaled_dot_product_attention`, `fast-xml-parser`). One numbered list per algorithm, under a short bold label.
-
-**<name of the algorithm/loop>**
-
-1. ...
-2. ...
 
 ---
 
