@@ -18,8 +18,8 @@ Every fork **must** keep the `**Forked from:**` line in its metadata block, poin
 **Numbering.** The preamble — Fork Contract, Warnings, Maintain This Plan, Preferences — is unnumbered, because it is the contract that frames the plan rather than part of the plan body. Everything from Context onward is a numbered section, optional ones included. The fixed order is:
 
 1. Context & Problem Statement
-2. Out of Scope / Non-Goals
-3. Execution Steps
+2. Execution Steps
+3. Out of Scope / Non-Goals
 4. Architecture
 5. Data Snippets
 6. Implementation Details
@@ -65,7 +65,7 @@ Short, high-signal traps specific to this project. One bullet each: what bit us,
 - Update in the same turn when facts, constraints, paths, decisions, findings, postmortems, eval/experiment results, judgement calls, tests, or failures change.
 - Keep: decisions + *why*, file paths, commands, thresholds, acceptance criteria, rollback, and next steps.
 - Drop: diary text, stale alternatives, "we tried X and it failed" narration. Incident history lives in section 13 (Postmortems), not here.
-- Keep **one** status table (section 3). Move rows `not started` -> `started (<brief status>)` -> `completed`. Commit + push between meaningful status/result updates.
+- Keep **one** status table (section 2). Move rows `not started` -> `started (<brief status>)` -> `completed`. Commit + push between meaningful status/result updates.
 - section 14 (Project History) is append-only: one bullet per meaningful shipped unit.
 - Keep section 12 (File List) current — it is the index a cold reader uses to find everything.
 - Every new rule needs a test, or a stated reason no test can catch it.
@@ -92,15 +92,7 @@ What is the problem, who has it, why now, and what "done" looks like. State the 
 
 ---
 
-## 2. Out of Scope / Non-Goals
-
-Explicit boundaries so scope does not creep — placed right after the problem statement because non-goals bound it. **Keep this extra brief: 5 bullets or fewer.** Each is what the plan deliberately does **not** do, plus one line of why.
-
-- ...
-
----
-
-## 3. Execution Steps
+## 2. Execution Steps
 
 The single source of truth for progress. Keep statuses current.
 
@@ -109,6 +101,14 @@ The single source of truth for progress. Keep statuses current.
 | 1 | <task> | not started |
 | 2 | <task> | started — <brief status> |
 | 3 | <task> | completed |
+
+---
+
+## 3. Out of Scope / Non-Goals
+
+Explicit boundaries so scope does not creep. **Keep this extra brief: 5 bullets or fewer.** Each is what the plan deliberately does **not** do, plus one line of why.
+
+- ...
 
 ---
 

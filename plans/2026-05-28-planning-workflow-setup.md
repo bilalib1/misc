@@ -25,7 +25,7 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ## Maintain This Plan
 
-- Keep one status table (section 3); move rows as work progresses, commit + push between meaningful updates.
+- Keep one status table (section 2); move rows as work progresses, commit + push between meaningful updates.
 - Keep section 12 (File List) current.
 - Project History is append-only; incidents go to `postmortems/`.
 
@@ -39,15 +39,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
-## 2. Out of Scope / Non-Goals
-
-- Building any application — this is workflow scaffolding only.
-- CI / pre-commit hooks — not needed for a docs repo yet.
-- Migrating existing projects into `~/code` — future, per-repo.
-
----
-
-## 3. Execution Steps
+## 2. Execution Steps
 
 | # | Task | Status |
 |---|------|--------|
@@ -59,6 +51,14 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 | 6 | Install `gh` | completed |
 | 7 | `gh auth login` (browser web flow) | completed — account bilalib1 |
 | 8 | `gh repo create` + `git push -u origin main` | completed — github.com/bilalib1/misc |
+
+---
+
+## 3. Out of Scope / Non-Goals
+
+- Building any application — this is workflow scaffolding only.
+- CI / pre-commit hooks — not needed for a docs repo yet.
+- Migrating existing projects into `~/code` — future, per-repo.
 
 ---
 
