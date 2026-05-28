@@ -156,4 +156,4 @@ Trivially reversible: `rm -rf ~/code/misc` removes the repo; nothing is publishe
 
 ## Project History
 
-- **2026-05-28** — Set up `~/code` parent + `~/code/misc` repo, generalized `plan-template.md`, first forked plan. (commit SHA pending; remote pending auth)
+- **2026-05-28** — Set up `~/code` parent + `~/code/misc` repo, generalized `plan-template.md`, first forked plan. Commit `f351298`. (remote pending `gh auth login`)
