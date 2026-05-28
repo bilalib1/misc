@@ -151,14 +151,22 @@ Anything blocked on the human, or still undecided — the agent's running queue.
 
 ## 8. Test Plan / Acceptance Criteria
 
-- **E2E / manual test plan:** the exact steps a human runs to confirm it works, with expected outputs (counts, IDs, latencies, screenshots).
-- **Automated tests:** list the layers that apply and the cheapest one that catches the bug.
-  - Unit: pure logic.
-  - Integration: against a real local DB/service.
-  - E2E / Playwright: UI and routing flows (if relevant).
-  - Production check: curl/query the shipped surface with expected values.
-- **Acceptance criteria:** the concrete, checkable conditions that mean this is done.
-- Do not commit failing tests. If `main` is already red on unrelated tests, name the exact failures.
+### A. E2E / Human Test Plan
+
+The exact steps a human runs end to end to confirm it works, with expected outputs (counts, IDs, latencies, screenshots). Write it so someone else could follow it without asking questions.
+
+### B. Acceptance Criteria
+
+The concrete, checkable conditions that mean this is done — each one true/false, no judgement calls.
+
+### C. Automated Tests
+
+Brief descriptions of the automated tests we'd want, focused on the **edge cases** each one catches (not just the happy path). Name the layer per test and prefer the cheapest one that catches the bug. Do not commit failing tests; if `main` is already red on unrelated tests, name the exact failures.
+
+- Unit: pure logic — `<edge case this covers>`.
+- Integration: real local DB/service — `<edge case>`.
+- E2E / Playwright: UI and routing flows (if relevant) — `<edge case>`.
+- Production check: curl/query the shipped surface with expected values.
 
 ---
 
