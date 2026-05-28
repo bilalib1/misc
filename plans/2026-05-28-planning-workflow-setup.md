@@ -9,7 +9,33 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ---
 
-## Maintain This Plan
+## 1. How To Use This Template
+
+Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below is numbered and **stays in every fork** — never delete one, so the order is absolute. If a section doesn't apply, write `not applicable` plus one line why. **Postmortems is second-to-last and Project History last** — attention on a long doc is U-shaped, so the end stays high-attention; this keeps lessons salient without cluttering the top.
+
+1. How To Use This Template
+2. Maintain This Plan
+3. Preferences
+4. Context & Problem Statement
+5. Execution Steps
+6. Out of Scope / Non-Goals
+7. Architecture
+8. Data Snippets — *if relevant*
+9. Implementation Details
+10. Open Questions / Decisions Needed
+11. Test Plan / Acceptance Criteria
+12. References / Links
+13. File List
+14. Long Jobs / Backfill — *optional*
+15. Rollback Plan — *optional*
+16. Postmortems — *default `not applicable`*
+17. Project History — **last**
+
+**500 lines max.** Cut prose first when tight.
+
+---
+
+## 2. Maintain This Plan
 
 - **This is a living document — maintain it constantly.** Update this file the moment anything changes: new info, a decision (even minor), a course change, an experiment result, a postmortem, a new constraint, a status change. Curate context here so we can clear the conversation and resume cold.
 - **Own the plan.** Update + commit + push *in the same turn* at every checkpoint above.
@@ -21,7 +47,20 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ---
 
-## 1. Context & Problem Statement
+## 3. Preferences
+
+- Be autonomous. Decide and execute; ask only when blocked.
+- Read before write. Verify with data before mutating shared state.
+- Evidence first: problem, observations, decision, implementation.
+- TDD by default: cheapest failing test, minimum fix, refactor.
+- Plain words. Small steps. Reversible beats clever.
+- Push back before destructive actions.
+- Commit by filename, never `git add .`. Commit before any build.
+- **Clear, jargon-free prose.** Precise technical terms yes; buzzwords and filler no. Dense and transparent — Steinbeck, not David Foster Wallace. Cut any word not earning its place.
+
+---
+
+## 4. Context & Problem Statement
 
 Agentic SWE sessions lose context when the conversation is cleared or compacted. We want a single living document per task that holds the durable state — decisions, architecture, data shapes, steps, tests — so any fresh agent or human can resume cold. This plan sets up the directory layout, git tracking, a generalized template to fork, and the GitHub remote.
 
@@ -29,7 +68,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
-## 2. Execution Steps
+## 5. Execution Steps
 
 | # | Task | Status |
 |---|------|--------|
@@ -44,7 +83,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
-## 3. Out of Scope / Non-Goals
+## 6. Out of Scope / Non-Goals
 
 - Building any application — this is workflow scaffolding only.
 - CI / pre-commit hooks — not needed for a docs repo yet.
@@ -52,7 +91,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
-## 4. Architecture
+## 7. Architecture
 
 ```
 ~/code/                        # top-level parent, NOT a repo; holds many repos
@@ -64,11 +103,11 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
         └── YYYY-MM-DD-<slug>.md
 ```
 
-Flow: new task -> copy `plan-template.md` to `plans/<dated-slug>.md` -> fill required sections -> work the steps table -> commit + push at each checkpoint. The conversation can be cleared anytime; the plan file is the recovery point.
+Flow: new task -> copy `plan-template.md` to `plans/<dated-slug>.md` -> fill the sections -> work the steps table -> commit + push at each checkpoint. The conversation can be cleared anytime; the plan file is the recovery point.
 
 ---
 
-## 5. Data Snippets
+## 8. Data Snippets
 
 Required metadata block at the top of every fork:
 
@@ -86,10 +125,10 @@ Status-table row convention (the load-bearing data structure of the workflow):
 
 ---
 
-## 6. Implementation Details
+## 9. Implementation Details
 
 1. `mkdir -p ~/code` as the parent for many repos (not itself a repo).
-2. Author `plan-template.md`: unnumbered preamble (Fork Contract, Warnings, Maintain, Preferences), numbered body, optional sections grouped at the bottom, Postmortems second-to-last, Project History numberless and last.
+2. Author `plan-template.md`: 17 numbered sections in fixed order — How To Use, Maintain, Preferences, then the body, with Postmortems second-to-last and Project History last; no section is deletable on fork.
 3. `mkdir ~/code/misc/{plans,postmortems}`; move template + plan in.
 4. Fork the template into this plan as the canonical worked example.
 5. `git init` in `misc`, branch `main`, commit by filename (never `git add .`).
@@ -99,32 +138,32 @@ Status-table row convention (the load-bearing data structure of the workflow):
 
 ---
 
-## 7. Open Questions / Decisions Needed
+## 10. Open Questions / Decisions Needed
 
 All resolved as of 2026-05-28:
 - **Repo name/visibility:** private repo `misc` (used the default).
 - **Auth:** `gh auth login` completed — account `bilalib1`, SSH protocol.
-- **Section set + order:** numbered body with Postmortems second-to-last and Project History numberless — confirmed by Bilal.
+- **Section set + order:** 17 numbered sections, none deletable, Postmortems second-to-last, Project History last — confirmed by Bilal.
 
 ---
 
-## 8. Test Plan / Acceptance Criteria
+## 11. Test Plan / Acceptance Criteria
 
 - **Manual check:** `ls ~/code` shows `misc/` (and no top-level `.git`); `ls ~/code/misc` shows `plan-template.md`, `plans/`, `postmortems/`; `git -C ~/code/misc log --oneline` shows the commits; `git -C ~/code/misc status` is clean.
 - **Remote check:** `git -C ~/code/misc remote -v` shows `origin`; `git push` succeeds; repo visible on GitHub.
-- **Acceptance:** template has all required sections in the fixed order; this plan is a valid fork; both files committed and pushed.
-- No automated tests — docs + repo scaffolding. Regression guard is the template's own required-sections checklist.
+- **Acceptance:** template has all 17 sections in the fixed order; this plan is a valid fork; both files committed and pushed.
+- No automated tests — docs + repo scaffolding. Regression guard is the template's own numbered-section list.
 
 ---
 
-## 9. References / Links
+## 12. References / Links
 
 - `~/code/misc/plan-template.md` — the template this plan forks.
 - GitHub remote: https://github.com/bilalib1/misc (private; SSH origin `git@github.com:bilalib1/misc.git`).
 
 ---
 
-## 10. File List
+## 13. File List
 
 - `~/code/` — top-level parent dir for many repos; not a git repo itself.
 - `~/code/misc/` — git repo home for planning docs; pushes to GitHub `origin`.
@@ -134,24 +173,24 @@ All resolved as of 2026-05-28:
 
 ---
 
-## 11. Long Jobs / Backfill
+## 14. Long Jobs / Backfill
 
 not applicable — no long-running or bulk jobs in this task.
 
 ---
 
-## 12. Rollback Plan
+## 15. Rollback Plan
 
 Trivially reversible: `rm -rf ~/code/misc` removes the repo. After push, delete the GitHub repo via `gh repo delete`.
 
 ---
 
-## 13. Postmortems
+## 16. Postmortems
 
 not applicable — no prod-visible, costly (\$/compute/time), or high-churn events in this setup task.
 
 ---
 
-## Project History
+## 17. Project History
 
 - **2026-05-28** — Set up `~/code` parent + `~/code/misc` repo, generalized `plan-template.md`, first forked plan; pushed to private remote github.com/bilalib1/misc. Initial commit `f351298`.

@@ -9,34 +9,35 @@ One paragraph: the problem, why it matters, what this plan changes. Replace in e
 
 ---
 
-## How To Use This Template
+## 1. How To Use This Template
 
-Meta-instructions about the template — delete this section in the fork.
+Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below is numbered and **stays in every fork** — never delete one, so the order is absolute. If a section doesn't apply, write `not applicable` plus one line why. **Postmortems is second-to-last and Project History last** — attention on a long doc is U-shaped, so the end stays high-attention; this keeps lessons salient without cluttering the top.
 
-Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. The body is numbered; the preamble below (Maintain, Preferences) is unnumbered and frames the plan. Optional sections sit at the bottom, defaulting to `not applicable`. **Postmortems is second-to-last and Project History last** — attention on a long doc is U-shaped, so the end stays high-attention; this keeps lessons salient without cluttering the top.
+1. How To Use This Template
+2. Maintain This Plan
+3. Preferences
+4. Context & Problem Statement
+5. Execution Steps
+6. Out of Scope / Non-Goals
+7. Architecture
+8. Data Snippets — *if relevant*
+9. Implementation Details
+10. Open Questions / Decisions Needed
+11. Test Plan / Acceptance Criteria
+12. References / Links
+13. File List
+14. Long Jobs / Backfill — *optional*
+15. Rollback Plan — *optional*
+16. Postmortems — *default `not applicable`*
+17. Project History — **last**
 
-1. Context & Problem Statement
-2. Execution Steps
-3. Out of Scope / Non-Goals
-4. Architecture
-5. Data Snippets — *if relevant*
-6. Implementation Details
-7. Open Questions / Decisions Needed
-8. Test Plan / Acceptance Criteria
-9. References / Links
-10. File List
-11. Long Jobs / Backfill — *optional*
-12. Rollback Plan — *optional*
-13. Postmortems — *default `not applicable`*
-— Project History — **numberless, last**
-
-**Required** (if N/A, say so + one line why): preamble + 1, 2, 3, 4, 6, 7, 8, 9, 10, Project History. **Required when relevant:** 5, 13. **Optional:** 11, 12, plus add-ins (Risks, Decision Log, Dependencies, Glossary, Build/Deploy, Work Logs) — add to the bottom block, numbered in sequence.
+Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy, Work Logs)? Insert it just before Project History and renumber from there.
 
 **500 lines max.** Cut prose first when tight.
 
 ---
 
-## Maintain This Plan
+## 2. Maintain This Plan
 
 - **This is a living document — maintain it constantly.** The moment anything changes, update this file: new info, a decision (even a minor one), a course change, an experiment result, a postmortem, a new constraint, a status change. It is a living human↔agent contract — curate context here so we can clear the conversation and resume cold from this file alone.
 - **Own the plan.** Update + commit + push *in the same turn* at every checkpoint above.
@@ -48,7 +49,7 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 
 ---
 
-## Preferences
+## 3. Preferences
 
 - Be autonomous. Decide and execute; ask only when blocked.
 - Read before write. Verify with data before mutating shared state.
@@ -61,13 +62,13 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 
 ---
 
-## 1. Context & Problem Statement
+## 4. Context & Problem Statement
 
 The problem, who has it, why now, and what "done" looks like. State constraints. Current state before desired state.
 
 ---
 
-## 2. Execution Steps
+## 5. Execution Steps
 
 Single source of truth for progress. Keep statuses current.
 
@@ -79,7 +80,7 @@ Single source of truth for progress. Keep statuses current.
 
 ---
 
-## 3. Out of Scope / Non-Goals
+## 6. Out of Scope / Non-Goals
 
 Boundaries so scope does not creep. **5 bullets or fewer.** Each: what we deliberately do **not** do, plus why.
 
@@ -87,13 +88,13 @@ Boundaries so scope does not creep. **5 bullets or fewer.** Each: what we delibe
 
 ---
 
-## 4. Architecture
+## 7. Architecture
 
 How the pieces fit: components, data flow, key interfaces, where this plugs in. A small ASCII diagram beats a paragraph. Note the boundaries we must not touch.
 
 ---
 
-## 5. Data Snippets
+## 8. Data Snippets
 
 *(if relevant — otherwise `not applicable`)*
 
@@ -105,7 +106,7 @@ Ground the work in real shapes. **Include 3 examples** of whatever is central �
 
 ---
 
-## 6. Implementation Details
+## 9. Implementation Details
 
 Spell out **every key algorithm, loop, and transformation step by step** as a numbered list, in succinct plain English — concrete enough to execute without re-deriving the design. Prefer clear English > pseudocode > code; use code only to name the heavy-lifting library/call (e.g. `torch.nn.functional.scaled_dot_product_attention`, `fast-xml-parser`). One numbered list per algorithm, under a short bold label.
 
@@ -116,7 +117,7 @@ Spell out **every key algorithm, loop, and transformation step by step** as a nu
 
 ---
 
-## 7. Open Questions / Decisions Needed
+## 10. Open Questions / Decisions Needed
 
 The agent's running queue — what's blocked on the human or undecided. Read first on resume. Move resolved items to the relevant section and delete here.
 
@@ -124,7 +125,7 @@ The agent's running queue — what's blocked on the human or undecided. Read fir
 
 ---
 
-## 8. Test Plan / Acceptance Criteria
+## 11. Test Plan / Acceptance Criteria
 
 ### A. E2E / Human Test Plan
 
@@ -132,7 +133,7 @@ The exact end-to-end steps a human runs to confirm it works, with expected outpu
 
 ### B. Acceptance Criteria
 
-Concrete true/false conditions that mean done, no judgement calls. (Section 1's "done" is the prose vision; this is the checklist — don't duplicate.)
+Concrete true/false conditions that mean done, no judgement calls. (Section 4's "done" is the prose vision; this is the checklist — don't duplicate.)
 
 ### C. Automated Tests
 
@@ -145,7 +146,7 @@ The tests we want, each described by the **edge case** it catches (not the happy
 
 ---
 
-## 9. References / Links
+## 12. References / Links
 
 Tickets, design docs, dashboards, related plans, external API docs.
 
@@ -153,7 +154,7 @@ Tickets, design docs, dashboards, related plans, external API docs.
 
 ---
 
-## 10. File List
+## 13. File List
 
 Index of every relevant path: source files touched, configs, data, related docs/plans, external doc URLs — each with a one-line note.
 
@@ -161,7 +162,7 @@ Index of every relevant path: source files touched, configs, data, related docs/
 
 ---
 
-## 11. Long Jobs / Backfill
+## 14. Long Jobs / Backfill
 
 *(optional — default `not applicable`)*
 
@@ -175,7 +176,7 @@ Any job over ~5 min, bulk writes, or recomputes. "Dataset-only" does not exempt 
 
 ---
 
-## 12. Rollback Plan
+## 15. Rollback Plan
 
 *(optional — `not applicable` if trivially reversible)*
 
@@ -183,7 +184,7 @@ Exact steps + commands to undo a shipped change, and how to tell it worked.
 
 ---
 
-## 13. Postmortems
+## 16. Postmortems
 
 *(default `not applicable`; the moment a trigger fires, write the entry in the same turn)*
 
@@ -199,8 +200,8 @@ not applicable — no triggering event yet.
 
 ---
 
-## Project History
+## 17. Project History
 
-Append-only. One bullet per meaningful shipped unit. (Numberless, last.)
+Append-only. One bullet per meaningful shipped unit. (Last.)
 
 - **YYYY-MM-DD** — [what shipped, why, commit SHA or link].
