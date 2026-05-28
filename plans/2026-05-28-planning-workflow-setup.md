@@ -17,7 +17,7 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ---
 
-## Warnings / Brief Postmortems
+## Warnings / Traps
 
 - not applicable — no traps hit. (Setup note: `gh auth login` configured the SSH protocol and registered a key, so `git push` works over SSH even though a bare `ssh -T git@github.com` failed before login.)
 
@@ -25,8 +25,8 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ## Maintain This Plan
 
-- Keep one status table (section 2); move rows as work progresses, commit + push between meaningful updates.
-- Keep section 13 (File List) current.
+- Keep one status table (the Execution Steps section); move rows as work progresses, commit + push between meaningful updates.
+- Keep the File List current.
 - Project History is append-only; incidents go to `postmortems/`.
 
 ---
@@ -44,7 +44,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 | # | Task | Status |
 |---|------|--------|
 | 1 | Create `~/code/` as multi-repo parent | completed |
-| 2 | Write generalized `plan-template.md` (final section set + order) | completed |
+| 2 | Write generalized `plan-template.md` | completed |
 | 3 | Create `~/code/misc` repo with `plans/` + `postmortems/` | completed |
 | 4 | Write this first forked plan | completed |
 | 5 | `git init` in `misc`, commit docs by filename | completed |
@@ -78,13 +78,7 @@ Flow: new task -> copy `plan-template.md` to `plans/<dated-slug>.md` -> fill req
 
 ---
 
-## 5. Postmortems
-
-not applicable — no prod-visible, costly (\$/compute/time), or high-churn events in this setup task.
-
----
-
-## 6. Data Snippets
+## 5. Data Snippets
 
 Required metadata block at the top of every fork:
 
@@ -102,57 +96,45 @@ Status-table row convention (the load-bearing data structure of the workflow):
 
 ---
 
-## 7. Implementation Details
+## 6. Implementation Details
 
-1. `mkdir -p ~/code` as the parent for many repos (not itself a repo). *(done)*
-2. Author `plan-template.md`: required sections = Fork Contract, Warnings, Maintain, numbered 1-7, Out of Scope, Open Questions, References/Links, File List, Project History (last). Rollback optional. App-specific build/cgroup rules generalized into optional guidance. *(done)*
-3. `mkdir ~/code/misc/{plans,postmortems}`; move template + plan in. *(done)*
-4. Fork the template into this plan as the canonical worked example. *(done)*
-5. `git init` in `misc`, branch `main`, commit by filename (never `git add .`). *(in progress)*
-6. `brew install gh`. *(done)*
-7. `gh auth login` via browser web flow — no SSH key required; sets up HTTPS auth in `osxkeychain`.
-8. `gh repo create bilal/misc --private --source=. --remote=origin --push` (or equivalent), then push at each checkpoint thereafter.
+1. `mkdir -p ~/code` as the parent for many repos (not itself a repo).
+2. Author `plan-template.md`: unnumbered preamble (Fork Contract, Warnings, Maintain, Preferences), numbered body, optional sections grouped at the bottom, Postmortems second-to-last, Project History numberless and last.
+3. `mkdir ~/code/misc/{plans,postmortems}`; move template + plan in.
+4. Fork the template into this plan as the canonical worked example.
+5. `git init` in `misc`, branch `main`, commit by filename (never `git add .`).
+6. `brew install gh`.
+7. `gh auth login` via browser web flow — sets up SSH protocol and registers a key.
+8. `gh repo create misc --private --source=. --remote=origin --push`, then push at each checkpoint thereafter.
 
 ---
 
-## 8. Open Questions / Decisions Needed
+## 7. Open Questions / Decisions Needed
 
 All resolved as of 2026-05-28:
 - **Repo name/visibility:** private repo `misc` (used the default).
 - **Auth:** `gh auth login` completed — account `bilalib1`, SSH protocol.
-- **Required section set:** Out of Scope, Open Questions, References, File List required; Rollback optional — confirmed by Bilal.
+- **Section set + order:** numbered body with Postmortems second-to-last and Project History numberless — confirmed by Bilal.
 
 ---
 
-## 9. Test Plan / Acceptance Criteria
+## 8. Test Plan / Acceptance Criteria
 
-- **Manual check:** `ls ~/code` shows `misc/` (and no top-level `.git`); `ls ~/code/misc` shows `plan-template.md`, `plans/`, `postmortems/`; `git -C ~/code/misc log --oneline` shows the setup commit; `git -C ~/code/misc status` is clean.
+- **Manual check:** `ls ~/code` shows `misc/` (and no top-level `.git`); `ls ~/code/misc` shows `plan-template.md`, `plans/`, `postmortems/`; `git -C ~/code/misc log --oneline` shows the commits; `git -C ~/code/misc status` is clean.
 - **Remote check:** `git -C ~/code/misc remote -v` shows `origin`; `git push` succeeds; repo visible on GitHub.
-- **Acceptance:** template has all required sections in the fixed order with Project History last; this plan is a valid fork; both files committed and pushed.
+- **Acceptance:** template has all required sections in the fixed order; this plan is a valid fork; both files committed and pushed.
 - No automated tests — docs + repo scaffolding. Regression guard is the template's own required-sections checklist.
 
 ---
 
-## 10. Long Jobs / Backfill
-
-not applicable — no long-running or bulk jobs in this task.
-
----
-
-## 11. Rollback Plan
-
-Trivially reversible: `rm -rf ~/code/misc` removes the repo; nothing is published until step 8. After push, delete the GitHub repo via `gh repo delete`.
-
----
-
-## 12. References / Links
+## 9. References / Links
 
 - `~/code/misc/plan-template.md` — the template this plan forks.
 - GitHub remote: https://github.com/bilalib1/misc (private; SSH origin `git@github.com:bilalib1/misc.git`).
 
 ---
 
-## 13. File List
+## 10. File List
 
 - `~/code/` — top-level parent dir for many repos; not a git repo itself.
 - `~/code/misc/` — git repo home for planning docs; pushes to GitHub `origin`.
@@ -162,6 +144,24 @@ Trivially reversible: `rm -rf ~/code/misc` removes the repo; nothing is publishe
 
 ---
 
-## 14. Project History
+## 11. Long Jobs / Backfill
+
+not applicable — no long-running or bulk jobs in this task.
+
+---
+
+## 12. Rollback Plan
+
+Trivially reversible: `rm -rf ~/code/misc` removes the repo. After push, delete the GitHub repo via `gh repo delete`.
+
+---
+
+## 13. Postmortems
+
+not applicable — no prod-visible, costly (\$/compute/time), or high-churn events in this setup task.
+
+---
+
+## Project History
 
 - **2026-05-28** — Set up `~/code` parent + `~/code/misc` repo, generalized `plan-template.md`, first forked plan; pushed to private remote github.com/bilalib1/misc. Initial commit `f351298`.
