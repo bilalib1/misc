@@ -122,7 +122,7 @@ How the pieces fit: components, data flow, key interfaces, and where this work p
 
 *(if relevant — otherwise `not applicable`)*
 
-Ground the work in the real shapes we handle. Paste concrete examples in code blocks: a key JSON payload we parse, an API request/response we call, a training-dataset row, or 2-3 example input/outputs of an ML model. Prefer **real queried examples over invented ones** — if we can query the DB/API for samples, include several.
+Ground the work in the real shapes we handle. **Always include 3 examples** of whatever is central to this work — a JSON payload we parse, an API request/response, a training-dataset row, or input/outputs of an ML model. Keep each to one snippet of **~10 relevant lines at most** (trim the rest, mark cuts with `...`). Prefer **real queried examples over invented ones** — if we can query the DB/API for samples, do that.
 
 ```json
 { "example": "replace with a real payload central to this work" }
