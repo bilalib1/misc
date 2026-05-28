@@ -67,6 +67,8 @@ Short, high-signal traps specific to this project. One bullet each: what bit us,
 - Push back before destructive actions.
 - Commit by filename, never `git add .`. Commit before any build.
 
+**Write plans in clear, jargon-free language.** The reader is an engineer, so precise technical terms are welcome — but buzzwords, filler, and showy vocabulary are not. Aim for dense *and* transparent: every sentence carries information a human can read at a glance. Steinbeck, not David Foster Wallace. Say "we fetch the row once and write all outputs together," not "we leverage a holistic single-pass synergy." If a word is not earning its place, cut it.
+
 ---
 
 ## 1. Context & Problem Statement
