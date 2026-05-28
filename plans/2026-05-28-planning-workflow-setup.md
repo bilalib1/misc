@@ -25,8 +25,8 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ## Maintain This Plan
 
-- Keep one status table (section 2); move rows as work progresses, commit + push between meaningful updates.
-- Keep the [File List](#file-list) current.
+- Keep one status table (section 3); move rows as work progresses, commit + push between meaningful updates.
+- Keep section 12 (File List) current.
 - Project History is append-only; incidents go to `postmortems/`.
 
 ---
@@ -39,7 +39,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
-## Out of Scope / Non-Goals
+## 2. Out of Scope / Non-Goals
 
 - Building any application — this is workflow scaffolding only.
 - CI / pre-commit hooks — not needed for a docs repo yet.
@@ -47,7 +47,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
-## 2. Execution Steps
+## 3. Execution Steps
 
 | # | Task | Status |
 |---|------|--------|
@@ -62,7 +62,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
-## 3. Architecture
+## 4. Architecture
 
 ```
 ~/code/                        # top-level parent, NOT a repo; holds many repos
@@ -78,7 +78,7 @@ Flow: new task -> copy `plan-template.md` to `plans/<dated-slug>.md` -> fill req
 
 ---
 
-## 4. Data Snippets
+## 5. Data Snippets
 
 Required metadata block at the top of every fork:
 
@@ -96,7 +96,7 @@ Status-table row convention (the load-bearing data structure of the workflow):
 
 ---
 
-## 5. Implementation Details
+## 6. Implementation Details
 
 1. `mkdir -p ~/code` as the parent for many repos (not itself a repo). *(done)*
 2. Author `plan-template.md`: required sections = Fork Contract, Warnings, Maintain, numbered 1-7, Out of Scope, Open Questions, References/Links, File List, Project History (last). Rollback optional. App-specific build/cgroup rules generalized into optional guidance. *(done)*
@@ -109,7 +109,16 @@ Status-table row convention (the load-bearing data structure of the workflow):
 
 ---
 
-## 6. Test Plan / Acceptance Criteria
+## 7. Open Questions / Decisions Needed
+
+All resolved as of 2026-05-28:
+- **Repo name/visibility:** private repo `misc` (used the default).
+- **Auth:** `gh auth login` completed — account `bilalib1`, SSH protocol.
+- **Required section set:** Out of Scope, Open Questions, References, File List required; Rollback optional — confirmed by Bilal.
+
+---
+
+## 8. Test Plan / Acceptance Criteria
 
 - **Manual check:** `ls ~/code` shows `misc/` (and no top-level `.git`); `ls ~/code/misc` shows `plan-template.md`, `plans/`, `postmortems/`; `git -C ~/code/misc log --oneline` shows the setup commit; `git -C ~/code/misc status` is clean.
 - **Remote check:** `git -C ~/code/misc remote -v` shows `origin`; `git push` succeeds; repo visible on GitHub.
@@ -118,34 +127,26 @@ Status-table row convention (the load-bearing data structure of the workflow):
 
 ---
 
-## 7. Long Jobs / Backfill
+## 9. Long Jobs / Backfill
 
 not applicable — no long-running or bulk jobs in this task.
 
 ---
 
-## Open Questions / Decisions Needed
-
-- **GitHub repo name + visibility:** default plan is a **private** repo named `misc`. Confirm name/visibility, or say "use defaults."
-- **Auth:** will run `gh auth login` (browser web flow) interactively — needs you to complete the browser step.
-- **Promote any optional header to required?** Current required set already includes Out of Scope, Open Questions, References, File List per your call. Rollback stays optional.
-
----
-
-## Rollback Plan
+## 10. Rollback Plan
 
 Trivially reversible: `rm -rf ~/code/misc` removes the repo; nothing is published until step 8. After push, delete the GitHub repo via `gh repo delete`.
 
 ---
 
-## References / Links
+## 11. References / Links
 
 - `~/code/misc/plan-template.md` — the template this plan forks.
 - GitHub remote: https://github.com/bilalib1/misc (private; SSH origin `git@github.com:bilalib1/misc.git`).
 
 ---
 
-## File List
+## 12. File List
 
 - `~/code/` — top-level parent dir for many repos; not a git repo itself.
 - `~/code/misc/` — git repo home for planning docs; pushes to GitHub `origin`.
@@ -155,6 +156,6 @@ Trivially reversible: `rm -rf ~/code/misc` removes the repo; nothing is publishe
 
 ---
 
-## Project History
+## 13. Project History
 
 - **2026-05-28** — Set up `~/code` parent + `~/code/misc` repo, generalized `plan-template.md`, first forked plan; pushed to private remote github.com/bilalib1/misc. Initial commit `f351298`.
