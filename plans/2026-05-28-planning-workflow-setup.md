@@ -39,6 +39,14 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 
 ---
 
+## Out of Scope / Non-Goals
+
+- Building any application — this is workflow scaffolding only.
+- CI / pre-commit hooks — not needed for a docs repo yet.
+- Migrating existing projects into `~/code` — future, per-repo.
+
+---
+
 ## 2. Execution Steps
 
 | # | Task | Status |
@@ -47,10 +55,10 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 | 2 | Write generalized `plan-template.md` (final section set + order) | completed |
 | 3 | Create `~/code/misc` repo with `plans/` + `postmortems/` | completed |
 | 4 | Write this first forked plan | completed |
-| 5 | `git init` in `misc`, commit docs by filename | started — committing now |
+| 5 | `git init` in `misc`, commit docs by filename | completed |
 | 6 | Install `gh` | completed |
-| 7 | `gh auth login` (browser web flow) | not started — run interactively with Bilal |
-| 8 | `gh repo create` + `git push -u origin main` | not started — after auth |
+| 7 | `gh auth login` (browser web flow) | completed — account bilalib1 |
+| 8 | `gh repo create` + `git push -u origin main` | started — creating remote |
 
 ---
 
@@ -113,14 +121,6 @@ Status-table row convention (the load-bearing data structure of the workflow):
 ## 7. Long Jobs / Backfill
 
 not applicable — no long-running or bulk jobs in this task.
-
----
-
-## Out of Scope / Non-Goals
-
-- Building any application — this is workflow scaffolding only.
-- CI / pre-commit hooks — not needed for a docs repo yet.
-- Migrating existing projects into `~/code` — future, per-repo.
 
 ---
 

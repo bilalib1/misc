@@ -21,7 +21,7 @@ Every fork **must** keep the `**Forked from:**` line in its metadata block, poin
 
 Keep it brief: **500 lines max.** Prose is the first thing to cut when space is tight.
 
-Section order is fixed: the meta block, then numbered 1-7, then the supporting sections, then **Project History last**.
+Section order is fixed: the meta block, then section 1 (Context) immediately followed by Out of Scope, then numbered sections 2-7, then the remaining supporting sections, then **Project History last**.
 
 ---
 
@@ -71,7 +71,15 @@ Short, high-signal traps specific to this project. One bullet each: what bit us,
 
 ## 1. Context & Problem Statement
 
-What is the problem, who has it, why now, and what "done" looks like. State the constraints. Ground the reader in the current state before the desired state. (Boundaries go in [Out of Scope](#out-of-scope--non-goals).)
+What is the problem, who has it, why now, and what "done" looks like. State the constraints. Ground the reader in the current state before the desired state.
+
+---
+
+## Out of Scope / Non-Goals
+
+Explicit boundaries so scope does not creep — placed right after the problem statement because non-goals bound it. List what this plan deliberately does **not** do, and one line of why for each.
+
+- ...
 
 ---
 
@@ -138,14 +146,6 @@ Any job over ~5 minutes, bulk writes, or recomputes. "Dataset-only" does not exe
 - One expensive pass per row: fetch inputs once, run models once, write all derived outputs together.
 - For paid API calls, persist the raw result before the next call (raw output, parsed value, model, prompt hash, config, input id, latency, error, tokens, cost).
 - After start, verify the actual resource footprint (CPU/memory/affinity) matches the limits before walking away.
-
----
-
-## Out of Scope / Non-Goals
-
-Explicit boundaries so scope does not creep. List what this plan deliberately does **not** do, and one line of why for each.
-
-- ...
 
 ---
 
