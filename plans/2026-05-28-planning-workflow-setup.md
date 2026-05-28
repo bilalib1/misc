@@ -1,7 +1,7 @@
 # Planning Workflow Setup - Bilal Plan
 
 **Date:** 2026-05-28
-**Status:** In flight
+**Status:** Shipped
 **Owner:** Bilal
 **Forked from:** [`plan-template.md`](../plan-template.md)
 
@@ -19,7 +19,7 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ## Warnings / Brief Postmortems
 
-- Until `gh auth login` succeeds and a remote is added, "push" is a local commit only. Do not claim changes are pushed — say "committed locally" until the remote is live.
+- not applicable — no traps hit. (Setup note: `gh auth login` configured the SSH protocol and registered a key, so `git push` works over SSH even though a bare `ssh -T git@github.com` failed before login.)
 
 ---
 
@@ -58,7 +58,7 @@ Agentic SWE sessions lose context when the conversation is cleared or compacted.
 | 5 | `git init` in `misc`, commit docs by filename | completed |
 | 6 | Install `gh` | completed |
 | 7 | `gh auth login` (browser web flow) | completed — account bilalib1 |
-| 8 | `gh repo create` + `git push -u origin main` | started — creating remote |
+| 8 | `gh repo create` + `git push -u origin main` | completed — github.com/bilalib1/misc |
 
 ---
 
@@ -141,7 +141,7 @@ Trivially reversible: `rm -rf ~/code/misc` removes the repo; nothing is publishe
 ## References / Links
 
 - `~/code/misc/plan-template.md` — the template this plan forks.
-- GitHub remote — TBD once `gh repo create` runs (record URL here).
+- GitHub remote: https://github.com/bilalib1/misc (private; SSH origin `git@github.com:bilalib1/misc.git`).
 
 ---
 
@@ -157,4 +157,4 @@ Trivially reversible: `rm -rf ~/code/misc` removes the repo; nothing is publishe
 
 ## Project History
 
-- **2026-05-28** — Set up `~/code` parent + `~/code/misc` repo, generalized `plan-template.md`, first forked plan. Commit `f351298`. (remote pending `gh auth login`)
+- **2026-05-28** — Set up `~/code` parent + `~/code/misc` repo, generalized `plan-template.md`, first forked plan; pushed to private remote github.com/bilalib1/misc. Initial commit `f351298`.
