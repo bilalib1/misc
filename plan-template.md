@@ -132,7 +132,9 @@ Ground the work in the real shapes we handle. **Always include 3 examples** of w
 
 ## 6. Implementation Details
 
-Numbered, step-by-step algorithms in **precise plain English**. Order of preference: clear English > pseudocode > code. Use code sparingly — only to name the specific library, API call, or special function that does the heavy lifting (e.g. "use `torch.nn.functional.scaled_dot_product_attention`", "parse with `fast-xml-parser`"). Each step should be concrete enough to execute without re-deriving the design.
+Write out **every key algorithm, loop, and data transformation step by step** as a numbered list, in succinct plain English. This is where the actual logic lives — spell out each step so it can be executed without re-deriving the design. Order of preference: clear English > pseudocode > code. Use code sparingly — only to name the specific library, API call, or special function that does the heavy lifting (e.g. "use `torch.nn.functional.scaled_dot_product_attention`", "parse with `fast-xml-parser`"). Give each distinct algorithm/loop its own numbered list under a short bold label.
+
+**<name of the algorithm/loop>**
 
 1. ...
 2. ...
