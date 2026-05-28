@@ -9,25 +9,15 @@ Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as 
 
 ---
 
-## Fork Contract
-
-- **Be autonomous.** Decide and execute; ask only when blocked or before destructive/irreversible actions.
-- **The plan is the agent's responsibility.** Update + commit + push this file in the same turn at every checkpoint (decision, change of course, postmortem, insight, research/experiment result, new constraint, status change).
-- **Read before write.** Verify with real data before mutating shared state.
-
----
-
-## Warnings / Traps
-
-- not applicable — no traps hit. (Setup note: `gh auth login` configured the SSH protocol and registered a key, so `git push` works over SSH even though a bare `ssh -T git@github.com` failed before login.)
-
----
-
 ## Maintain This Plan
 
-- Keep one status table (the Execution Steps section); move rows as work progresses, commit + push between meaningful updates.
-- Keep the File List current.
-- Project History is append-only; incidents go to `postmortems/`.
+- **This is a living document — maintain it constantly.** Update this file the moment anything changes: new info, a decision (even minor), a course change, an experiment result, a postmortem, a new constraint, a status change. Curate context here so we can clear the conversation and resume cold.
+- **Own the plan.** Update + commit + push *in the same turn* at every checkpoint above.
+- **Be autonomous.** Decide and execute; ask only when blocked or before destructive/irreversible actions.
+- **Read before write.** Verify with real data before mutating shared state.
+- One status table (the Execution Steps section); move rows as work progresses. Project History is append-only; incidents go to `postmortems/`. Keep the File List current.
+
+*(Setup note: `gh auth login` configured the SSH protocol and registered a key, so `git push` works over SSH even though a bare `ssh -T git@github.com` failed before login.)*
 
 ---
 

@@ -5,17 +5,15 @@
 **Owner:** [name]
 **Forked from:** [`plan-template.md`](../plan-template.md)
 
-One short paragraph: the problem, why it matters, and what this plan will change. Replace this line in every fork.
+One paragraph: the problem, why it matters, what this plan changes. Replace in every fork.
 
 ---
 
 ## How To Use This Template
 
-Fork this file into `plans/YYYY-MM-DD-<slug>.md` for each new task. This is a **living contract between human and agent**: the agent curates context here so we can clear the conversation often and never lose state. A reader (human or freshly-cleared agent) must be able to pick up the work cold from this file alone.
+Meta-instructions about the template — delete this section in the fork.
 
-Every fork **must** keep the `**Forked from:**` line in its metadata block, pointing at this template's path (relative to the fork, e.g. `../plan-template.md`). It marks the file as a Bilal plan and lets a cold reader find the meta-rules.
-
-**Numbering and order.** The preamble — Fork Contract, Warnings, Maintain This Plan, Preferences — is unnumbered: it is the contract that frames the plan, not part of the body. The body is numbered. Optional sections are grouped at the **bottom**, each defaulting to `not applicable` until it applies. **Project History is numberless and always last.** **Postmortems sits second-to-last, just above Project History** — model attention on a long document is U-shaped (the "lost in the middle" effect), so the end is high-attention too. This rides the recency boost to keep lessons salient and stop us repeating a mistake, while leaving the top free for the design narrative.
+Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. The body is numbered; the preamble below (Maintain, Preferences) is unnumbered and frames the plan. Optional sections sit at the bottom, defaulting to `not applicable`. **Postmortems is second-to-last and Project History last** — attention on a long doc is U-shaped, so the end stays high-attention; this keeps lessons salient without cluttering the top.
 
 1. Context & Problem Statement
 2. Execution Steps
@@ -29,72 +27,49 @@ Every fork **must** keep the `**Forked from:**` line in its metadata block, poin
 10. File List
 11. Long Jobs / Backfill — *optional*
 12. Rollback Plan — *optional*
-13. Postmortems — *second-to-last on purpose; default `not applicable`*
-— Project History — **numberless, always last**
+13. Postmortems — *default `not applicable`*
+— Project History — **numberless, last**
 
-**Required** (never delete; if it does not apply, write `not applicable` and one line of why): the unnumbered preamble plus 1, 2, 3, 4, 6, 7, 8, 9, 10, and Project History. **Required only when relevant:** 5 (Data Snippets), 13 (Postmortems). **Optional:** 11, 12, and any add-ins.
+**Required** (if N/A, say so + one line why): preamble + 1, 2, 3, 4, 6, 7, 8, 9, 10, Project History. **Required when relevant:** 5, 13. **Optional:** 11, 12, plus add-ins (Risks, Decision Log, Dependencies, Glossary, Build/Deploy, Work Logs) — add to the bottom block, numbered in sequence.
 
-**Other optional sections** you may add when they earn their place — Risks & Mitigations, Decision Log, Dependencies / Prerequisites, Glossary, Build / Deploy, Work Logs — go in the bottom optional block (after Rollback, before Postmortems), numbered in sequence.
-
-Keep it brief: **500 lines max.** Prose is the first thing to cut when space is tight.
-
----
-
-## Fork Contract
-
-Copy this scaffold verbatim into every fork — do not abbreviate or link out. If context is tight, cut project prose first but keep: **Fork Contract, Warnings, the Execution Steps table, Tests / Acceptance, Long Jobs / Backfill, Postmortems, Project History.**
-
-Standing rules (see Preferences):
-
-- **Be autonomous.** Decide and execute. Ask only when blocked or before destructive/irreversible actions.
-- **The plan is the agent's responsibility.** Update + commit + push this file *in the same turn* whenever we hit a checkpoint: a decision, a change of course, a postmortem, a key insight, a research result, a finished experiment, a new constraint, or a status change. Do not wait to be told.
-- **Read before write.** Verify with real data before mutating shared state.
-
----
-
-## Warnings / Traps
-
-Short, high-signal traps specific to this project. One bullet each: what bit us, and the one-line prevention. Link full writeups in the Postmortems section. Keep this list pruned — move resolved/stale items out.
-
-- *(example)* **YYYY-MM-DD - <short title>.** What happened in one sentence. Prevention: <the rule>. Postmortem: `postmortems/...md`.
+**500 lines max.** Cut prose first when tight.
 
 ---
 
 ## Maintain This Plan
 
-- Update in the same turn when facts, constraints, paths, decisions, findings, postmortems, eval/experiment results, judgement calls, tests, or failures change.
-- Keep: decisions + *why*, file paths, commands, thresholds, acceptance criteria, rollback, and next steps.
-- Drop: diary text, stale alternatives, "we tried X and it failed" narration. Incident history lives in the Postmortems section, not here.
-- Keep **one** status table (the Execution Steps section). Move rows `not started` -> `started (<brief status>)` -> `completed`. Commit + push between meaningful status/result updates.
-- Project History is append-only: one bullet per meaningful shipped unit.
-- Keep the File List current — it is the index a cold reader uses to find everything.
-- Every new rule needs a test, or a stated reason no test can catch it.
+- **This is a living document — maintain it constantly.** The moment anything changes, update this file: new info, a decision (even a minor one), a course change, an experiment result, a postmortem, a new constraint, a status change. It is a living human↔agent contract — curate context here so we can clear the conversation and resume cold from this file alone.
+- **Own the plan.** Update + commit + push *in the same turn* at every checkpoint above.
+- **Be autonomous.** Decide and execute. Ask only when blocked or before destructive/irreversible actions.
+- **Read before write.** Verify with real data before mutating shared state.
+- Keep: decisions + *why*, paths, commands, thresholds, acceptance, rollback, next steps. Drop: diary text, dead alternatives, "we tried X" narration — incidents go to Postmortems.
+- One status table (Execution Steps). Move rows `not started` -> `started (status)` -> `completed`.
+- Project History is append-only. Keep the File List current. Every new rule needs a test, or a reason none can catch it.
 
 ---
 
 ## Preferences
 
-- Be autonomous. Decide and execute. Ask only when blocked.
+- Be autonomous. Decide and execute; ask only when blocked.
 - Read before write. Verify with data before mutating shared state.
 - Evidence first: problem, observations, decision, implementation.
 - TDD by default: cheapest failing test, minimum fix, refactor.
 - Plain words. Small steps. Reversible beats clever.
 - Push back before destructive actions.
 - Commit by filename, never `git add .`. Commit before any build.
-
-**Write plans in clear, jargon-free language.** The reader is an engineer, so precise technical terms are welcome — but buzzwords, filler, and showy vocabulary are not. Aim for dense *and* transparent: every sentence carries information a human can read at a glance. Steinbeck, not David Foster Wallace. Say "we fetch the row once and write all outputs together," not "we leverage a holistic single-pass synergy." If a word is not earning its place, cut it.
+- **Clear, jargon-free prose.** Precise technical terms yes; buzzwords and filler no. Dense and transparent — Steinbeck, not David Foster Wallace. "We fetch the row once and write all outputs together," not "we leverage a holistic single-pass synergy." Cut any word not earning its place.
 
 ---
 
 ## 1. Context & Problem Statement
 
-What is the problem, who has it, why now, and what "done" looks like. State the constraints. Ground the reader in the current state before the desired state.
+The problem, who has it, why now, and what "done" looks like. State constraints. Current state before desired state.
 
 ---
 
 ## 2. Execution Steps
 
-The single source of truth for progress. Keep statuses current.
+Single source of truth for progress. Keep statuses current.
 
 | # | Task | Status |
 |---|------|--------|
@@ -106,7 +81,7 @@ The single source of truth for progress. Keep statuses current.
 
 ## 3. Out of Scope / Non-Goals
 
-Explicit boundaries so scope does not creep. **Keep this extra brief: 5 bullets or fewer.** Each is what the plan deliberately does **not** do, plus one line of why.
+Boundaries so scope does not creep. **5 bullets or fewer.** Each: what we deliberately do **not** do, plus why.
 
 - ...
 
@@ -114,7 +89,7 @@ Explicit boundaries so scope does not creep. **Keep this extra brief: 5 bullets 
 
 ## 4. Architecture
 
-How the pieces fit: components, data flow, key interfaces, and where this work plugs into the existing system. A small diagram (ASCII is fine) beats a paragraph. Note the boundaries we touch and the ones we must not.
+How the pieces fit: components, data flow, key interfaces, where this plugs in. A small ASCII diagram beats a paragraph. Note the boundaries we must not touch.
 
 ---
 
@@ -122,7 +97,7 @@ How the pieces fit: components, data flow, key interfaces, and where this work p
 
 *(if relevant — otherwise `not applicable`)*
 
-Ground the work in the real shapes we handle. **Always include 3 examples** of whatever is central to this work — a JSON payload we parse, an API request/response, a training-dataset row, or input/outputs of an ML model. Keep each to one snippet of **~10 relevant lines at most** (trim the rest, mark cuts with `...`). Prefer **real queried examples over invented ones** — if we can query the DB/API for samples, do that.
+Ground the work in real shapes. **Include 3 examples** of whatever is central — a JSON payload, an API request/response, a dataset row, ML model in/outputs. **~10 lines each at most** (trim with `...`). Prefer **real queried examples** over invented ones.
 
 ```json
 { "example": "replace with a real payload central to this work" }
@@ -132,7 +107,7 @@ Ground the work in the real shapes we handle. **Always include 3 examples** of w
 
 ## 6. Implementation Details
 
-Write out **every key algorithm, loop, and data transformation step by step** as a numbered list, in succinct plain English. This is where the actual logic lives — spell out each step so it can be executed without re-deriving the design. Order of preference: clear English > pseudocode > code. Use code sparingly — only to name the specific library, API call, or special function that does the heavy lifting (e.g. "use `torch.nn.functional.scaled_dot_product_attention`", "parse with `fast-xml-parser`"). Give each distinct algorithm/loop its own numbered list under a short bold label.
+Spell out **every key algorithm, loop, and transformation step by step** as a numbered list, in succinct plain English — concrete enough to execute without re-deriving the design. Prefer clear English > pseudocode > code; use code only to name the heavy-lifting library/call (e.g. `torch.nn.functional.scaled_dot_product_attention`, `fast-xml-parser`). One numbered list per algorithm, under a short bold label.
 
 **<name of the algorithm/loop>**
 
@@ -143,7 +118,7 @@ Write out **every key algorithm, loop, and data transformation step by step** as
 
 ## 7. Open Questions / Decisions Needed
 
-Anything blocked on the human, or still undecided — the agent's running queue. A freshly-cleared agent should read this to see what is open. Move resolved items into the relevant section (or the optional Decision Log if used) and delete them here.
+The agent's running queue — what's blocked on the human or undecided. Read first on resume. Move resolved items to the relevant section and delete here.
 
 - ...
 
@@ -153,26 +128,26 @@ Anything blocked on the human, or still undecided — the agent's running queue.
 
 ### A. E2E / Human Test Plan
 
-The exact steps a human runs end to end to confirm it works, with expected outputs (counts, IDs, latencies, screenshots). Write it so someone else could follow it without asking questions.
+The exact end-to-end steps a human runs to confirm it works, with expected outputs (counts, IDs, latencies, screenshots). Followable without questions.
 
 ### B. Acceptance Criteria
 
-The concrete, checkable conditions that mean this is done — each one true/false, no judgement calls. (Section 1's "done" is the prose vision; this is the checklist. Do not duplicate.)
+Concrete true/false conditions that mean done, no judgement calls. (Section 1's "done" is the prose vision; this is the checklist — don't duplicate.)
 
 ### C. Automated Tests
 
-Brief descriptions of the automated tests we'd want, focused on the **edge cases** each one catches (not just the happy path). Name the layer per test and prefer the cheapest one that catches the bug. Do not commit failing tests; if `main` is already red on unrelated tests, name the exact failures.
+The tests we want, each described by the **edge case** it catches (not the happy path). Name the layer; prefer the cheapest catch. Don't commit failing tests; if `main` is already red on unrelated tests, name them.
 
-- Unit: pure logic — `<edge case this covers>`.
+- Unit: pure logic — `<edge case>`.
 - Integration: real local DB/service — `<edge case>`.
-- E2E / Playwright: UI and routing flows (if relevant) — `<edge case>`.
+- E2E / Playwright: UI and routing (if relevant) — `<edge case>`.
 - Production check: curl/query the shipped surface with expected values.
 
 ---
 
 ## 9. References / Links
 
-Tickets, design docs, dashboards, related plans, external API docs — anything a reader needs to follow the work.
+Tickets, design docs, dashboards, related plans, external API docs.
 
 - ...
 
@@ -180,7 +155,7 @@ Tickets, design docs, dashboards, related plans, external API docs — anything 
 
 ## 10. File List
 
-The index of every relevant path for this work. Keep current. Include source files created/touched, configs, data files, related docs/plans, and external doc URLs — each with a one-line note.
+Index of every relevant path: source files touched, configs, data, related docs/plans, external doc URLs — each with a one-line note.
 
 - `path/to/file` — what it is / why it matters.
 
@@ -190,19 +165,19 @@ The index of every relevant path for this work. Keep current. Include source fil
 
 *(optional — default `not applicable`)*
 
-Any job over ~5 minutes, bulk writes, or recomputes. "Dataset-only" does not exempt it.
+Any job over ~5 min, bulk writes, or recomputes. "Dataset-only" does not exempt it.
 
-- Use a managed/supervised runner with resource limits; never fire-and-forget background processes that can starve the primary app or DB.
-- Specify: runner name, claim/version/attempt guards, batch size, sleep between batches, thread/concurrency caps, progress logging, error capture + flush, alerting, and pause/resume + rollback.
-- One expensive pass per row: fetch inputs once, run models once, write all derived outputs together.
-- For paid API calls, persist the raw result before the next call (raw output, parsed value, model, prompt hash, config, input id, latency, error, tokens, cost).
-- After start, verify the actual resource footprint (CPU/memory/affinity) matches the limits before walking away.
+- Use a managed/supervised runner with resource limits; no fire-and-forget processes that starve the app/DB.
+- Specify: runner name, claim/version/attempt guards, batch size, sleep, thread caps, progress logging, error capture + flush, alerting, pause/resume + rollback.
+- One expensive pass per row: fetch once, run models once, write all outputs together.
+- Paid API calls: persist the raw result before the next call (raw output, parsed value, model, prompt hash, config, input id, latency, error, tokens, cost).
+- After start, verify the real resource footprint (CPU/memory/affinity) matches the limits.
 
 ---
 
 ## 12. Rollback Plan
 
-*(optional — default `not applicable` if the change is trivially reversible)*
+*(optional — `not applicable` if trivially reversible)*
 
 Exact steps + commands to undo a shipped change, and how to tell it worked.
 
@@ -210,20 +185,15 @@ Exact steps + commands to undo a shipped change, and how to tell it worked.
 
 ## 13. Postmortems
 
-*(second-to-last on purpose — see the numbering note. Default to `not applicable`; the moment a trigger below fires, write the entry in the same turn.)*
+*(default `not applicable`; the moment a trigger fires, write the entry in the same turn)*
 
-Write a postmortem in `postmortems/` for any event that was **expensive in money, time, or churn** — not just user-facing breakage. Triggers:
+Write a postmortem in `postmortems/` for any event **expensive in money, time, or churn** — not just user-facing breakage. Triggers:
 
-- A **prod-visible** regression or outage.
-- A job that **cost real money** (paid API calls, GPU/CPU compute) or **a lot of wall-clock time** (long GPU/CPU runs, big backfills, long waits).
-- A solution that took **heavy churn** — many repeated failed attempts, reverts, or commits before it worked.
+- **Prod-visible** regression or outage.
+- **Costly:** real money (paid API, GPU/CPU compute) or wall-clock time (long runs, big backfills, long waits).
+- **High churn:** many repeated failed attempts, reverts, or commits before it worked.
 
-Each writeup:
-
-- Include severity, cost (\$ and wall-clock time), impact, root cause, UTC timeline, why it was not caught earlier, follow-ups, and lessons.
-- Link the fix/commit(s).
-- Add the cheapest regression test or guardrail, or state why none can catch it.
-- Add one Project History bullet pointing to the postmortem, and a one-line Warnings entry if it is a recurring trap.
+Each writeup: severity, cost (\$ + time), impact, root cause, UTC timeline, why it slipped through, follow-ups, lessons. Link the fix commit. Add the cheapest regression test/guardrail or say why none can catch it. Add a Project History bullet.
 
 not applicable — no triggering event yet.
 
@@ -231,6 +201,6 @@ not applicable — no triggering event yet.
 
 ## Project History
 
-Append-only. One bullet per meaningful shipped unit. (Numberless, always last.)
+Append-only. One bullet per meaningful shipped unit. (Numberless, last.)
 
 - **YYYY-MM-DD** — [what shipped, why, commit SHA or link].
