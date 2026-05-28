@@ -3,6 +3,7 @@
 **Date:** 2026-05-28
 **Status:** In flight
 **Owner:** Bilal
+**Forked from:** [`plan-template.md`](../plan-template.md)
 
 Stand up `~/code` as the top-level parent for many repos, with `~/code/misc` as a git-tracked home for living plans plus a reusable `plan-template.md`. Goal: a durable human↔agent contract so we can curate context in the plan, clear the conversation often, and never lose state across agentic SWE tasks.
 

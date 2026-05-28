@@ -3,6 +3,7 @@
 **Date:** YYYY-MM-DD
 **Status:** Plan | In flight | Shipped
 **Owner:** [name]
+**Forked from:** [`plan-template.md`](../plan-template.md)
 
 One short paragraph: the problem, why it matters, and what this plan will change. Replace this line in every fork.
 
@@ -11,6 +12,8 @@ One short paragraph: the problem, why it matters, and what this plan will change
 ## How To Use This Template
 
 Fork this file into `plans/YYYY-MM-DD-<slug>.md` for each new task. This is a **living contract between human and agent**: the agent curates context here so we can clear the conversation often and never lose state. A reader (human or freshly-cleared agent) must be able to pick up the work cold from this file alone.
+
+Every fork **must** keep the `**Forked from:**` line in its metadata block, pointing at this template's path (relative to the fork, e.g. `../plan-template.md`). It marks the file as a Bilal plan and lets a cold reader find the meta-rules.
 
 **Required sections** (never delete; if one does not apply, write `not applicable` and one line of why): Fork Contract, Warnings, Maintain This Plan, the 7 numbered sections, Out of Scope, Open Questions, References / Links, File List, Project History.
 
