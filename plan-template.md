@@ -21,18 +21,18 @@ Every fork **must** keep the `**Forked from:**` line in its metadata block, poin
 2. Execution Steps
 3. Out of Scope / Non-Goals
 4. Architecture
-5. Data Snippets
-6. Implementation Details
-7. Open Questions / Decisions Needed
-8. Test Plan / Acceptance Criteria
-9. Long Jobs / Backfill — *optional*
-10. Rollback Plan — *optional*
-11. References / Links
-12. File List
-13. Postmortems — *optional, required once there is a prod-visible regression*
+5. Postmortems — *optional, required once a trigger fires (prod-visible / costly / high-churn)*
+6. Data Snippets
+7. Implementation Details
+8. Open Questions / Decisions Needed
+9. Test Plan / Acceptance Criteria
+10. Long Jobs / Backfill — *optional*
+11. Rollback Plan — *optional*
+12. References / Links
+13. File List
 14. Project History — **always last**
 
-**Required** (never delete; if one does not apply, write `not applicable` and one line of why): the unnumbered preamble plus sections 1-8, 11, 12, 14. **Optional:** 9, 10, 13.
+**Required** (never delete; if one does not apply, write `not applicable` and one line of why): the unnumbered preamble plus sections 1-4, 6-9, 12, 13, 14. **Optional:** 5, 10, 11.
 
 **Other optional sections** you may add when they earn their place — Risks & Mitigations, Decision Log, Dependencies / Prerequisites, Glossary, Build / Deploy, Work Logs. Insert each at the logical spot and give it the next number in document order, renumbering what follows.
 
@@ -54,7 +54,7 @@ The agent operates under these standing rules (see the Preferences section):
 
 ## Warnings / Brief Postmortems
 
-Short, high-signal traps specific to this project. One bullet each: what bit us, and the one-line prevention. Link full writeups in section 13 (Postmortems). Keep this list pruned — move resolved/stale items out.
+Short, high-signal traps specific to this project. One bullet each: what bit us, and the one-line prevention. Link full writeups in section 5 (Postmortems). Keep this list pruned — move resolved/stale items out.
 
 - *(example)* **YYYY-MM-DD - <short title>.** What happened in one sentence. Prevention: <the rule>. Postmortem: `postmortems/...md`.
 
@@ -64,10 +64,10 @@ Short, high-signal traps specific to this project. One bullet each: what bit us,
 
 - Update in the same turn when facts, constraints, paths, decisions, findings, postmortems, eval/experiment results, judgement calls, tests, or failures change.
 - Keep: decisions + *why*, file paths, commands, thresholds, acceptance criteria, rollback, and next steps.
-- Drop: diary text, stale alternatives, "we tried X and it failed" narration. Incident history lives in section 13 (Postmortems), not here.
+- Drop: diary text, stale alternatives, "we tried X and it failed" narration. Incident history lives in section 5 (Postmortems), not here.
 - Keep **one** status table (section 2). Move rows `not started` -> `started (<brief status>)` -> `completed`. Commit + push between meaningful status/result updates.
 - section 14 (Project History) is append-only: one bullet per meaningful shipped unit.
-- Keep section 12 (File List) current — it is the index a cold reader uses to find everything.
+- Keep section 13 (File List) current — it is the index a cold reader uses to find everything.
 - Every new rule needs a test, or a stated reason no test can catch it.
 
 ---
@@ -118,7 +118,26 @@ How the pieces fit: components, data flow, key interfaces, and where this work p
 
 ---
 
-## 5. Data Snippets
+## 5. Postmortems
+
+*(write one in the same turn whenever a trigger below fires — otherwise `not applicable`)*
+
+Write a postmortem in `postmortems/` for any event that was **expensive in money, time, or churn** — not just user-facing breakage. Triggers:
+
+- A **prod-visible** regression or outage.
+- A job that **cost real money** (paid API calls, GPU/CPU compute) or **a lot of wall-clock time** (long GPU/CPU runs, big backfills, long waits).
+- A solution that took **heavy churn** — many repeated failed attempts, reverts, or commits before it worked.
+
+Each writeup:
+
+- Include severity, cost (\$ and wall-clock time), impact, root cause, UTC timeline, why it was not caught earlier, follow-ups, and lessons.
+- Link the fix/commit(s).
+- Add the cheapest regression test or guardrail, or state why none can catch it.
+- Add one section 14 (Project History) bullet pointing to the postmortem, and a one-line entry in Warnings if it is a recurring trap.
+
+---
+
+## 6. Data Snippets
 
 *(if relevant — otherwise `not applicable`)*
 
@@ -130,7 +149,7 @@ Ground the work in the real shapes we handle. **Always include 3 examples** of w
 
 ---
 
-## 6. Implementation Details
+## 7. Implementation Details
 
 Write out **every key algorithm, loop, and data transformation step by step** as a numbered list, in succinct plain English. This is where the actual logic lives — spell out each step so it can be executed without re-deriving the design. Order of preference: clear English > pseudocode > code. Use code sparingly — only to name the specific library, API call, or special function that does the heavy lifting (e.g. "use `torch.nn.functional.scaled_dot_product_attention`", "parse with `fast-xml-parser`"). Give each distinct algorithm/loop its own numbered list under a short bold label.
 
@@ -141,7 +160,7 @@ Write out **every key algorithm, loop, and data transformation step by step** as
 
 ---
 
-## 7. Open Questions / Decisions Needed
+## 8. Open Questions / Decisions Needed
 
 Anything blocked on the human, or still undecided — the agent's running queue. A freshly-cleared agent should read this first to see what is open. Move resolved items into the relevant section (or the optional Decision Log if used) and delete them here.
 
@@ -149,7 +168,7 @@ Anything blocked on the human, or still undecided — the agent's running queue.
 
 ---
 
-## 8. Test Plan / Acceptance Criteria
+## 9. Test Plan / Acceptance Criteria
 
 ### A. E2E / Human Test Plan
 
@@ -170,7 +189,7 @@ Brief descriptions of the automated tests we'd want, focused on the **edge cases
 
 ---
 
-## 9. Long Jobs / Backfill
+## 10. Long Jobs / Backfill
 
 *(if relevant — otherwise `not applicable`)*
 
@@ -184,7 +203,7 @@ Any job over ~5 minutes, bulk writes, or recomputes. "Dataset-only" does not exe
 
 ---
 
-## 10. Rollback Plan
+## 11. Rollback Plan
 
 *(optional — `not applicable` if the change is trivially reversible)*
 
@@ -192,7 +211,7 @@ Exact steps + commands to undo a shipped change, and how to tell it worked.
 
 ---
 
-## 11. References / Links
+## 12. References / Links
 
 Tickets, design docs, dashboards, related plans, external API docs — anything a reader needs to follow the work.
 
@@ -200,24 +219,11 @@ Tickets, design docs, dashboards, related plans, external API docs — anything 
 
 ---
 
-## 12. File List
+## 13. File List
 
 The index of every relevant path for this work. Keep current. Include source files created/touched, configs, data files, related docs/plans, and external doc URLs — each with a one-line note.
 
 - `path/to/file` — what it is / why it matters.
-
----
-
-## 13. Postmortems
-
-*(required once there is a prod-visible regression)*
-
-Every prod-visible regression gets a writeup in `postmortems/` in the same turn as the fix.
-
-- Include severity/duration, impact, root cause, UTC timeline, why tests missed it, follow-ups, and lessons.
-- Link the fix commit.
-- Add the cheapest regression test, or state why it is an ops guardrail no test can catch.
-- Add one section 14 (Project History) bullet pointing to the postmortem.
 
 ---
 
