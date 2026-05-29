@@ -60,7 +60,7 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 - Plain words. Small steps. Reversible beats clever.
 - Push back before destructive actions.
 - Commit by filename, never `git add .`. Commit before any build.
-- **Clear, jargon-free prose.** Precise technical terms yes; buzzwords and filler no. Dense and transparent — Steinbeck, not David Foster Wallace. "We fetch the row once and write all outputs together," not "we leverage a holistic single-pass synergy." Cut any word not earning its place.
+- **Never write paragraphs.** Use diagrams, bullets, and numbered lists only — never prose blocks. Within them keep words clear and jargon-free: precise technical terms yes; buzzwords and filler no. "We fetch the row once and write all outputs together," not "we leverage a holistic single-pass synergy." Cut any word not earning its place.
 
 ---
 
@@ -204,6 +204,6 @@ not applicable — no triggering event yet.
 
 ## 17. Project History
 
-Append-only. One bullet per meaningful shipped unit. (Last.)
+Append-only. One bullet per meaningful shipped unit. (Last.) **At most a couple short sentences per bullet** — what shipped and why, no more. Details belong in their own sections.
 
 - **YYYY-MM-DD** — [what shipped, why, commit SHA or link].
