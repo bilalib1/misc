@@ -53,12 +53,17 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 
 ## 3. Preferences
 
-- Be autonomous. Decide and execute; ask only when blocked.
-- Read before write. Verify with data before mutating shared state.
-- Evidence first: problem, observations, decision, implementation.
-- TDD by default: cheapest failing test, minimum fix, refactor.
+*These bias toward caution over speed; for trivial tasks, use judgment.*
+
+- **Be autonomous.** Decide and execute; ask when blocked, genuinely ambiguous, or before destructive/irreversible actions.
+- **Think before coding.** State assumptions explicitly. If multiple interpretations exist, present them — don't pick silently. Surface simpler approaches and tradeoffs; push back when warranted. When something is unclear, stop, name it, and ask *before* implementing — not after the mistake.
+- **Simplicity first.** Minimum code that solves the problem, nothing speculative — no unrequested features, no abstractions for single-use code, no configurability or error handling for impossible scenarios. If 200 lines could be 50, rewrite. (Boundaries live in §6.)
+- **Surgical changes.** Every changed line traces to the request. Match existing style even if you'd do it differently; don't refactor or reformat working code. Remove only the orphans your change created; flag pre-existing dead code, don't delete it.
+- **Goal-driven execution.** Turn each task into a verifiable goal ("add validation" → "write tests for invalid inputs, then make them pass"). State a brief plan with a *verify* check per step and loop until verified. (Pairs with TDD; criteria live in §11.)
+- **Read before write.** Verify with data before mutating shared state.
+- **Evidence first:** problem, observations, decision, implementation.
+- **TDD by default:** cheapest failing test, minimum fix, refactor.
 - Plain words. Small steps. Reversible beats clever.
-- Push back before destructive actions.
 - Commit by filename, never `git add .`. Commit before any build.
 - **Never write paragraphs.** Use diagrams, bullets, and numbered lists only — never prose blocks. Within them keep words clear and jargon-free: precise technical terms yes; buzzwords and filler no. "We fetch the row once and write all outputs together," not "we leverage a holistic single-pass synergy." Cut any word not earning its place.
 
