@@ -99,6 +99,20 @@ Boundaries so scope does not creep. **5 bullets or fewer.** Each: what we delibe
 
 How the pieces fit: components, data flow, key interfaces, where this plugs in. A small ASCII diagram beats a paragraph. Note the boundaries we must not touch.
 
+**Drawing the ASCII diagram** — rules for one that's beautiful on a small screen in a markdown viewer:
+
+1. **Flow top→bottom on a centered spine.** Primary flow descends with `▼`; reserve `▲` for genuine back-edges (reads, claims, recovery). A tall, thin diagram beats a wide one.
+2. **One concept per box, short label.** 1–3 words, plus an optional parenthetical subtitle line. Never cram pipelines, lists, or multi-step text inside a box.
+3. **Detail lives on the edges.** Label each connector beside its `│` with what flows along it (`HTTP POST`, `publish(event)`, `SSE stream`) — not inside the boxes.
+4. **Box charset:** `┌ ─ ┐ │ └ ┘`, one space of padding around the label. Outlets are `┬` cut into the bottom border; branches/junctions use `┬ ┴ ├ ┤`. Arrowheads (`▼ ▲`) only at a box's entry.
+5. **Align children under their parent's outlets.** Two outlets → two `┬` whose columns equal the child box centers, so the verticals drop straight.
+6. **Stay narrow (≤ ~50 visual columns).** Wrapping in a markdown pane destroys alignment. Note: box-drawing/arrow glyphs are multi-byte but render one column wide — count columns, not bytes.
+7. **Close with a one-line italic caption** stating the key invariant the boxes can't show (e.g. "Postgres is the only channel between server and worker").
+
+When alignment gets fiddly (branches, centered pairs), build the diagram on a column grid with a throwaway script rather than hand-counting spaces — it guarantees the connectors line up.
+
+Note the boundaries we must not touch.
+
 ---
 
 ## 8. Implementation Details
