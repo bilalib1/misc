@@ -22,16 +22,17 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 5. Execution Steps
 6. Out of Scope / Non-Goals
 7. Architecture
-8. Implementation Details
-9. Data Snippets — *if relevant*
-10. Open Questions / Decisions Needed
-11. Test Plan / Acceptance Criteria
-12. References / Links
-13. File List
-14. Long Jobs / Backfill — *optional*
-15. Rollback Plan — *optional*
-16. Postmortems — *default `not applicable`*
-17. Project History — **last**
+8. Database Schema
+9. Implementation Details
+10. Data Snippets — *if relevant*
+11. Open Questions / Decisions Needed
+12. Test Plan / Acceptance Criteria
+13. References / Links
+14. File List
+15. Long Jobs / Backfill — *optional*
+16. Rollback Plan — *optional*
+17. Postmortems — *default `not applicable`*
+18. Project History — **last**
 
 Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy, Work Logs)? Insert it just before Project History and renumber from there.
 
@@ -59,7 +60,7 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 - **Think before coding.** State assumptions explicitly. If multiple interpretations exist, present them — don't pick silently. Surface simpler approaches and tradeoffs; push back when warranted. When something is unclear, stop, name it, and ask *before* implementing — not after the mistake.
 - **Simplicity first.** Minimum code that solves the problem, nothing speculative — no unrequested features, no abstractions for single-use code, no configurability or error handling for impossible scenarios. If 200 lines could be 50, rewrite. (Boundaries live in §6.)
 - **Surgical changes.** Every changed line traces to the request. Match existing style even if you'd do it differently; don't refactor or reformat working code. Remove only the orphans your change created; flag pre-existing dead code, don't delete it.
-- **Goal-driven execution.** Turn each task into a verifiable goal ("add validation" → "write tests for invalid inputs, then make them pass"). State a brief plan with a *verify* check per step and loop until verified. (Pairs with TDD; criteria live in §11.)
+- **Goal-driven execution.** Turn each task into a verifiable goal ("add validation" → "write tests for invalid inputs, then make them pass"). State a brief plan with a *verify* check per step and loop until verified. (Pairs with TDD; criteria live in §12.)
 - **Read before write.** Verify with data before mutating shared state.
 - **Evidence first:** problem, observations, decision, implementation.
 - **TDD by default:** cheapest failing test, minimum fix, refactor.
@@ -128,7 +129,27 @@ Note the boundaries we must not touch.
 
 ---
 
-## 8. Implementation Details
+## 8. Database Schema
+
+The **primary table(s)** this plan reads or writes — the schema everything else hangs off. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any **migration**.
+
+**Status:** new — this doc creates it | existing — using as-is | existing — this doc alters it (migration `NNN_<name>.sql`)
+
+Per table, a short bold label then columns as a bullet list — `name TYPE` + a one-line note only where the *why* is non-obvious (constraint, default, nullability rationale). Group harvest-time/required vs. filled-later/nullable if that split matters. Close each table with **Indexes** (PK + each secondary index and the read it serves) and, if relevant, **Partitioning & evolution** (partition key + why, retention, how the schema changes safely later — e.g. expand-contract: add nullable column, backfill, switch reads, retire old).
+
+**`<table>`** — one-line purpose. *(new | existing)*
+
+- `PK <col> TYPE` — why this key.
+- `<col> TYPE` — note only if non-obvious.
+- `<col> TYPE NULL` — filled later by `<step>`.
+- *Indexes:* PK `(...)`; `(col, col)` — serves `<read>`. Add others only when a real query needs them, not speculatively.
+- *Partitioning/evolution (if relevant):* partition by `<col>` (why); retention `<N>`; new fields added as nullable columns (no rewrite).
+
+*When we'd split a table out:* note the 1:many / audited-history case that would justify a child table, and why it's not needed now.
+
+---
+
+## 9. Implementation Details
 
 Spell out **every key algorithm, loop, and transformation step by step** as a numbered list, in succinct plain English — concrete enough to execute without re-deriving the design. Prefer clear English > pseudocode > code; use code only to name the heavy-lifting library/call (e.g. `torch.nn.functional.scaled_dot_product_attention`, `fast-xml-parser`). One numbered list per algorithm, under a short bold label.
 
@@ -139,7 +160,7 @@ Spell out **every key algorithm, loop, and transformation step by step** as a nu
 
 ---
 
-## 9. Data Snippets
+## 10. Data Snippets
 
 *(if relevant — otherwise `not applicable`)*
 
@@ -151,7 +172,7 @@ Ground the work in real shapes. **Include 3 examples** of whatever is central �
 
 ---
 
-## 10. Open Questions / Decisions Needed
+## 11. Open Questions / Decisions Needed
 
 The agent's running queue — what's blocked on the human or undecided. Read first on resume. Move resolved items to the relevant section and delete here.
 
@@ -159,7 +180,7 @@ The agent's running queue — what's blocked on the human or undecided. Read fir
 
 ---
 
-## 11. Test Plan / Acceptance Criteria
+## 12. Test Plan / Acceptance Criteria
 
 ### A. E2E / Human Test Plan
 
@@ -180,7 +201,7 @@ The tests we want, each described by the **edge case** it catches (not the happy
 
 ---
 
-## 12. References / Links
+## 13. References / Links
 
 Tickets, design docs, dashboards, related plans, external API docs.
 
@@ -188,7 +209,7 @@ Tickets, design docs, dashboards, related plans, external API docs.
 
 ---
 
-## 13. File List
+## 14. File List
 
 Index of every relevant path: source files touched, configs, data, related docs/plans, external doc URLs — each with a one-line note.
 
@@ -196,7 +217,7 @@ Index of every relevant path: source files touched, configs, data, related docs/
 
 ---
 
-## 14. Long Jobs / Backfill
+## 15. Long Jobs / Backfill
 
 *(optional — default `not applicable`)*
 
@@ -210,7 +231,7 @@ Any job over ~5 min, bulk writes, or recomputes. "Dataset-only" does not exempt 
 
 ---
 
-## 15. Rollback Plan
+## 16. Rollback Plan
 
 *(optional — `not applicable` if trivially reversible)*
 
@@ -218,7 +239,7 @@ Exact steps + commands to undo a shipped change, and how to tell it worked.
 
 ---
 
-## 16. Postmortems
+## 17. Postmortems
 
 *(default `not applicable`; the moment a trigger fires, write the entry in the same turn)*
 
@@ -234,7 +255,7 @@ not applicable — no triggering event yet.
 
 ---
 
-## 17. Project History
+## 18. Project History
 
 Append-only. One bullet per meaningful shipped unit. (Last.) **At most a couple short sentences per bullet** — what shipped and why, no more. Details belong in their own sections.
 
