@@ -102,27 +102,27 @@ How the pieces fit: components, data flow, key interfaces, where this plugs in. 
 **ASCII diagram rules:** flow top→bottom on a centered spine (`▼` forward, `▲` back-edges); short label per box, detail on the edges beside each `│`; keep it narrow (≤~50 cols — count columns, not multi-byte glyphs); close with a one-line italic caption of the key invariant. For tricky alignment, build it on a column grid with a throwaway script. Example:
 
 ```
-      ┌────────────────┐
-      │ Capture Client │
-      └────────┬───────┘
-               │  HTTP POST · batch
-               ▼
-      ┌─────────────────┐
-      │ FastAPI Backend │
-      └───┬──────────┬──┘
-          │ writes   │ publish
-          ▼          ▼
-    ┌──────────┐  ┌─────┐
-    │ Postgres │  │ Hub │
-    └──────────┘  └──┬──┘
-                     │ SSE
-                     ▼
-           ┌───────────────────┐
-           │ Next.js Dashboard │
-           └───────────────────┘
+          ┌────────┐
+          │ Client │
+          └───┬────┘
+              │  request · batch
+              ▼
+   ┌──────────────────────┐
+   │  Ingestion Service    │
+   └─────┬──────────┬──────┘
+         │ writes   │ publish
+         ▼          ▼
+   ┌───────────┐ ┌─────┐
+   │ Datastore │ │ Bus │
+   └───────────┘ └──┬──┘
+                    │ stream
+                    ▼
+              ┌───────────┐
+              │ Dashboard │
+              └───────────┘
 ```
 
-*Postgres is the only persistence path; the Hub fans live deltas over SSE.*
+*The datastore is the only persistence path; the bus fans live deltas to subscribed clients.*
 
 Note the boundaries we must not touch.
 
