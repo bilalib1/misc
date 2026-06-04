@@ -38,7 +38,7 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 ## 2. Maintain This Plan
 
 - **This is a living document — maintain it constantly.** The moment anything changes, update this file: new info, a decision (even a minor one), a course change, an experiment result, a postmortem, a new constraint, a status change. It is a living human↔agent contract — curate context here so we can clear the conversation and resume cold from this file alone.
-- **Own the plan.** Update + commit + push *in the same turn* at every checkpoint above.
+- **Own the plan.** Update + commit + push *in the same turn* at checkpoints.
 - Keep: decisions + *why*, paths, commands, thresholds, acceptance, rollback, next steps.
 - Drop: diary text, dead alternatives, "we tried X" narration, excessive reasoning.
 - One status table (Execution Steps). Move rows `not started` -> `started (status)` -> `completed`.
