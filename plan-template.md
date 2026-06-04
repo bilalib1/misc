@@ -13,7 +13,7 @@ One paragraph: the problem, why it matters, what this plan changes. Replace in e
 
 **Repo layout:** `~/code` holds all repos, one directory per repo (this template lives in `~/code/misc`). Plans reference paths relative to their own repo root.
 
-Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below is numbered and **stays in every fork** — never delete one, so the order is absolute. If a section doesn't apply, write `not applicable` plus one line why. **Postmortems is second-to-last and Project History last** — attention on a long doc is U-shaped, so the end stays high-attention; this keeps lessons salient without cluttering the top.
+Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below is numbered and **stays in every fork**. If a section doesn't apply, write `not applicable` plus one line why.
 
 1. How To Use This Template
 2. Maintain This Plan
@@ -46,7 +46,8 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 - **Own the plan.** Update + commit + push *in the same turn* at every checkpoint above.
 - **Be autonomous.** Decide and execute. Ask only when blocked or before destructive/irreversible actions.
 - **Read before write.** Verify with real data before mutating shared state.
-- Keep: decisions + *why*, paths, commands, thresholds, acceptance, rollback, next steps. Drop: diary text, dead alternatives, "we tried X" narration — incidents go to Postmortems.
+- Keep: decisions + *why*, paths, commands, thresholds, acceptance, rollback, next steps.
+- Drop: diary text, dead alternatives, "we tried X" narration, excessive reasoning.
 - One status table (Execution Steps). Move rows `not started` -> `started (status)` -> `completed`.
 - Project History is append-only. Keep the File List current. Every new rule needs a test, or a reason none can catch it.
 
@@ -66,7 +67,7 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 - **TDD by default:** cheapest failing test, minimum fix, refactor.
 - Plain words. Small steps. Reversible beats clever.
 - Commit by filename, never `git add .`. Commit before any build.
-- **Never write paragraphs.** Use diagrams, bullets, and numbered lists only — never prose blocks. Within them keep words clear and jargon-free: precise technical terms yes; buzzwords and filler no. "We fetch the row once and write all outputs together," not "we leverage a holistic single-pass synergy." Cut any word not earning its place.
+- **Never write paragraphs.** Use diagrams, bullets, and numbered lists only — never prose blocks. Within them keep words clear and free of jargon/vocab words.
 
 ---
 
@@ -80,11 +81,11 @@ The problem, who has it, why now, and what "done" looks like. State constraints.
 
 Single source of truth for progress. Keep statuses current.
 
-| # | Task | Status |
-|---|------|--------|
-| 1 | <task> | not started |
-| 2 | <task> | started — <brief status> |
-| 3 | <task> | completed |
+| # | Task       | Status                       |
+| - | ---------- | ---------------------------- |
+| 1 | `<task>` | not started                  |
+| 2 | `<task>` | started —`<brief status>` |
+| 3 | `<task>` | completed                    |
 
 ---
 
@@ -100,18 +101,20 @@ Boundaries so scope does not creep. **5 bullets or fewer.** Each: what we delibe
 
 How the pieces fit: components, data flow, key interfaces, where this plugs in. A small ASCII diagram beats a paragraph. Note the boundaries we must not touch.
 
-**ASCII diagram rules:** flow top→bottom on a centered spine (`▼` forward, `▲` back-edges); short label per box, detail on the edges beside each `│`; keep it narrow (≤~50 cols — count columns, not multi-byte glyphs); close with a one-line italic caption of the key invariant. For tricky alignment, build it on a column grid with a throwaway script. Example:
+**ASCII diagram rules:** flow top→bottom on a centered spine (`▼` forward, `▲` back-edges); short label per box, detail on the edges beside each `│`; keep it narrow (≤~50 cols);
+
+Example:
 
 ```
           ┌────────┐
           │ Client │
           └───┬────┘
-              │  request · batch
+              │  POST /test
               ▼
    ┌──────────────────────┐
-   │  Ingestion Service    │
-   └─────┬──────────┬──────┘
-         │ writes   │ publish
+   │  Ingestion Service   │
+   └─────┬──────────┬─────┘
+  writes │          │ publish
          ▼          ▼
    ┌───────────┐ ┌─────┐
    │ Datastore │ │ Bus │
@@ -123,19 +126,11 @@ How the pieces fit: components, data flow, key interfaces, where this plugs in. 
               └───────────┘
 ```
 
-*The datastore is the only persistence path; the bus fans live deltas to subscribed clients.*
-
-Note the boundaries we must not touch.
-
 ---
 
 ## 8. Database Schema
 
-The **primary table(s)** this plan reads or writes — the schema everything else hangs off. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any **migration**.
-
-**Status:** new — this doc creates it | existing — using as-is | existing — this doc alters it (migration `NNN_<name>.sql`)
-
-Per table, a short bold label then columns as a bullet list — `name TYPE` + a one-line note only where the *why* is non-obvious (constraint, default, nullability rationale). Group harvest-time/required vs. filled-later/nullable if that split matters. Close each table with **Indexes** (PK + each secondary index and the read it serves) and, if relevant, **Partitioning & evolution** (partition key + why, retention, how the schema changes safely later — e.g. expand-contract: add nullable column, backfill, switch reads, retire old).
+The **primary table(s)** this plan reads or writes — the schema everything else hangs off. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any migration or alter's.
 
 **`<table>`** — one-line purpose. *(new | existing)*
 
@@ -145,13 +140,11 @@ Per table, a short bold label then columns as a bullet list — `name TYPE` + a 
 - *Indexes:* PK `(...)`; `(col, col)` — serves `<read>`. Add others only when a real query needs them, not speculatively.
 - *Partitioning/evolution (if relevant):* partition by `<col>` (why); retention `<N>`; new fields added as nullable columns (no rewrite).
 
-*When we'd split a table out:* note the 1:many / audited-history case that would justify a child table, and why it's not needed now.
-
 ---
 
 ## 9. Implementation Details
 
-Spell out **every key algorithm, loop, and transformation step by step** as a numbered list, in succinct plain English — concrete enough to execute without re-deriving the design. Prefer clear English > pseudocode > code; use code only to name the heavy-lifting library/call (e.g. `torch.nn.functional.scaled_dot_product_attention`, `fast-xml-parser`). One numbered list per algorithm, under a short bold label.
+Briefly write **every key algorithm, loop, and transformation step by step** as a numbered list, in succinct plain English — concrete enough to execute without re-deriving the design. Prefer clear English > pseudocode > code; use code only to name the heavy-lifting library/call (e.g. `torch.nn.functional.scaled_dot_product_attention`, `fast-xml-parser`). One numbered list per algorithm, under a short bold label.
 
 **<name of the algorithm/loop>**
 
@@ -184,7 +177,7 @@ The agent's running queue — what's blocked on the human or undecided. Read fir
 
 ### A. E2E / Human Test Plan
 
-The exact end-to-end steps a human runs to confirm it works, with expected outputs (counts, IDs, latencies, screenshots). Followable without questions.
+One code block with the exact end-to-end steps a human runs to confirm it works, with expected outputs (counts, IDs, latencies, screenshots). Followable without questions.
 
 ### B. Acceptance Criteria
 
@@ -225,9 +218,8 @@ Any job over ~5 min, bulk writes, or recomputes. "Dataset-only" does not exempt 
 
 - Use a managed/supervised runner with resource limits; no fire-and-forget processes that starve the app/DB.
 - Specify: runner name, claim/version/attempt guards, batch size, sleep, thread caps, progress logging, error capture + flush, alerting, pause/resume + rollback.
-- One expensive pass per row: fetch once, run models once, write all outputs together.
-- Paid API calls: persist the raw result before the next call (raw output, parsed value, model, prompt hash, config, input id, latency, error, tokens, cost).
-- After start, verify the real resource footprint (CPU/memory/affinity) matches the limits.
+- Paid API calls or time-consuming compute: stream and persist the raw results 1-by=1 (raw output, parsed value, model, prompt hash, config, input id, latency, error, tokens, cost).
+- If you need to test your changes by the outputs of a long-running job, consider setting up a regular agentic loop where you poll and tail logs at appropriate regular intervals (hourly, etc), fixing errors as they come up.
 
 ---
 
