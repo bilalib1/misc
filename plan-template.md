@@ -1,9 +1,5 @@
 # [Plan Title] - Bilal Plan Template
 
-**Date:** YYYY-MM-DD
-**Status:** Plan | In flight | Shipped
-**Owner:** [name]
-**Forked from:** [`plan-template.md`](../plan-template.md)
 
 One paragraph: the problem, why it matters, what this plan changes. Replace in every fork.
 
@@ -128,9 +124,9 @@ Example:
 
 ---
 
-## 8. Database Schema
+## 8. Databases and Schemas
 
-The **primary table(s)** this plan reads or writes — the schema everything else hangs off. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any migration or alter's.
+The **primary table(s)** or any kind of relevant persistent data schemas that this plan reads or writes. For example, could be a local FS-backed circular queue, or postgres, distributed kafka, depending on the project nature. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any migration or alter's.
 
 **`<table>`** — one-line purpose. *(new | existing)*
 
