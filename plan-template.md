@@ -62,7 +62,8 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
   - Commit often, by filename (never `git add .`)
   - Keep commits atomic — one logical change each — with grep-searchable titles and descriptions.
   - Optional, as useful: `git log`/`blame` to recover intent or escape churn on a bug; branch/tag a known-good state before risky work; worktrees to explore approaches in parallel; check the line-by-line diff to ground edits.
-- **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep`/`find`/`sed -n` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents.
+- **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep/grep -A,B,C`/`find`/`sed/tail/head` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents.
+- Delegate all long-running tasks to subagents so as to keep main chat unblocked.
 
 ---
 
