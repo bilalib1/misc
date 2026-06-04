@@ -29,8 +29,6 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 17. Postmortems — *default `not applicable`*
 18. Project History — **last**
 
-Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy, Work Logs)? Insert it just before Project History and renumber from there.
-
 **500 lines max.** Cut prose first when tight.
 
 ---
@@ -46,10 +44,10 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 
 ---
 
-## 3. Preferences
+## 3. Preferences / Best Practices
 
 - **Be autonomous.** Decide and execute; ask when blocked, genuinely ambiguous, or before destructive/irreversible actions.
-- **Think before coding.** State assumptions explicitly. If multiple interpretations exist, present them — don't pick silently. Surface simpler approaches and tradeoffs; push back when warranted. When something is unclear, stop, name it, and ask *before* implementing — not after the mistake.
+- **Think before coding.** State assumptions explicitly. Push back against the human when warranted. If multiple interpretations exist, present them — don't pick silently. Surface simpler approaches and tradeoffs.
 - **Simplicity first.** Minimum code that solves the problem, nothing speculative — no unrequested features, no abstractions for single-use code, no configurability or error handling for impossible scenarios. If 200 lines could be 50, rewrite. (Boundaries live in §6.)
 - **Surgical changes.** Every changed line traces to the request. Refactor when it unblocks the task (duplicated/convoluted code in your path, or to isolate code for a test) — never speculative cleanup of code you're just passing through.
 - **Goal-driven execution.** Turn each task into a verifiable goal ("add validation" → "write tests for invalid inputs, then make them pass"). State a brief plan with a *verify* check per step and loop until verified. (Pairs with TDD; criteria live in §12.)
@@ -58,11 +56,11 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 - **TDD by default:** cheapest failing test, minimum fix, refactor.
 - Plain words. Small steps. Reversible beats clever.
 - **Never write paragraphs.** Use diagrams, bullets, and numbered lists only — never prose blocks. Within them keep words clear and free of jargon/vocab words.
-- **Use git cleverly.**
-  - Commit often, by filename (never `git add .`)
-  - Keep commits atomic — one logical change each — with grep-searchable titles and descriptions.
-  - Optional, as useful: `git log`/`blame` to recover intent or escape churn on a bug; branch/tag a known-good state before risky work; worktrees to explore approaches in parallel; check the line-by-line diff to ground edits.
-- **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep/grep -A,B,C`/`find`/`sed/tail/head` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents.
+- **Use git cleverly, especially for debugging.**
+  - Commit often, by filename (never `git add .`); keep commits atomic — one logical change each — with grep-searchable titles and descriptions.
+  - *Debug with history:* `git log`/`blame` to recover intent, `bisect` to find the breaking commit, `reflog` to recover lost state, diff to ground edits.
+  - *As useful:* branch/tag a known-good state before risky work; worktrees to explore approaches in parallel.
+- **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep -A,B,C`/`find`/`sed/tail/head` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents. Write and checkin python scripts to do tasks we may want to repeat rather than running strings of adhoc commands.
 - Delegate all long-running tasks to subagents so as to keep main chat unblocked.
 
 ---
@@ -169,7 +167,7 @@ The agent's running queue — what's blocked on the human or undecided. Read fir
 
 ---
 
-## 12. Test Plan / Acceptance Criteria
+## 12. Test Plan / Acceptance Criteria / Repro Steps
 
 ### A. E2E / Human Test Plan
 
@@ -177,11 +175,11 @@ One code block with the exact end-to-end steps a human runs to confirm it works,
 
 ### B. Acceptance Criteria
 
-Concrete true/false conditions that mean done, no judgement calls. (Section 4's "done" is the prose vision; this is the checklist — don't duplicate.)
+Concrete true/false conditions that mean done, no judgement calls.
 
 ### C. Automated Tests
 
-The tests we want, each described by the **edge case** it catches (not the happy path). Name the layer; prefer the cheapest catch. Don't commit failing tests; if `main` is already red on unrelated tests, name them.
+Described tests by the edge case it catches. Name the layer. Don't commit failing tests; if `main` is already red on unrelated tests, name them.
 
 - Unit: pure logic — `<edge case>`.
 - Integration: real local DB/service — `<edge case>`.
@@ -200,7 +198,7 @@ Tickets, design docs, dashboards, related plans, external API docs.
 
 ## 14. File List
 
-Index of every relevant path: source files touched, configs, data, related docs/plans, external doc URLs — each with a one-line note.
+Index of every relevant path or dir: source files touched, data, related docs/plans, external doc URLs — each with a one-line note.
 
 - `path/to/file` — what it is / why it matters.
 
@@ -210,11 +208,9 @@ Index of every relevant path: source files touched, configs, data, related docs/
 
 *(optional — default `not applicable`)*
 
-Any job over ~5 min, bulk writes, or recomputes. "Dataset-only" does not exempt it.
+Any job over ~5 min, bulk writes, or recomputes.
 
-- Use a managed/supervised runner with resource limits; no fire-and-forget processes that starve the app/DB.
-- Specify: runner name, claim/version/attempt guards, batch size, sleep, thread caps, progress logging, error capture + flush, alerting, pause/resume + rollback.
-- Paid API calls or time-consuming compute: stream and persist the raw results 1-by=1 (raw output, parsed value, model, prompt hash, config, input id, latency, error, tokens, cost).
+- Paid API calls or time-consuming compute: stream and persist the raw results 1-by-1 (raw output, parsed value, model, prompt hash, config, input id, latency, error, tokens, cost).
 - If you need to test your changes by the outputs of a long-running job, consider setting up a regular agentic loop where you poll and tail logs at appropriate regular intervals (hourly, etc), fixing errors as they come up.
 
 ---
@@ -231,7 +227,7 @@ Exact steps + commands to undo a shipped change, and how to tell it worked.
 
 *(default `not applicable`; the moment a trigger fires, write the entry in the same turn)*
 
-Write a postmortem in `postmortems/` for any event **expensive in money, time, or churn** — not just user-facing breakage. Triggers:
+Write a postmortem in `postmortems/` for any event **expensive in money, time, or churn.** Triggers:
 
 - **Prod-visible** regression or outage.
 - **Costly:** real money (paid API, GPU/CPU compute) or wall-clock time (long runs, big backfills, long waits).
