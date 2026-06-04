@@ -22,7 +22,7 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 5. Execution Steps
 6. Out of Scope / Non-Goals
 7. Architecture
-8. Database Schema
+8. Database Schema — *optional*
 9. Implementation Details
 10. Data Snippets — *if relevant*
 11. Open Questions / Decisions Needed
