@@ -58,7 +58,7 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 - **Be succinct always.** Both in this doc and in conversation, prefer bullets, numbered lists, and diagrams over paragraphs. Avoid jargon/vocab words.
 - **Use git cleverly, especially for debugging.**
   - Commit often, by filename (never `git add .`); keep commits atomic — one logical change each — with grep-searchable titles and descriptions.
-  - *Debug with history:* `git log`/`blame` to recover intent, `bisect` to find the breaking commit, `reflog` to recover lost state, `git diff/show` to ground edits.
+  - *Debug with history:* `git log`/`blame` to recover intent, `git diff/show` to ground edits, `bisect` to find the breaking commit, `reflog` to recover lost state.
   - *As useful:* branch/tag a known-good state before risky work; worktrees to explore approaches in parallel.
 - **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep -C`/`find`/`sed/tail/head` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents.
 - Write python scripts to do tasks we may want to repeat rather than running strings of adhoc commands.
