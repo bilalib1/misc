@@ -1,6 +1,5 @@
 # [Plan Title] - Bilal Plan Template
 
-
 One paragraph: the problem, why it matters, what this plan changes. Replace in every fork.
 
 ---
@@ -40,8 +39,6 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 
 - **This is a living document — maintain it constantly.** The moment anything changes, update this file: new info, a decision (even a minor one), a course change, an experiment result, a postmortem, a new constraint, a status change. It is a living human↔agent contract — curate context here so we can clear the conversation and resume cold from this file alone.
 - **Own the plan.** Update + commit + push *in the same turn* at every checkpoint above.
-- **Be autonomous.** Decide and execute. Ask only when blocked or before destructive/irreversible actions.
-- **Read before write.** Verify with real data before mutating shared state.
 - Keep: decisions + *why*, paths, commands, thresholds, acceptance, rollback, next steps.
 - Drop: diary text, dead alternatives, "we tried X" narration, excessive reasoning.
 - One status table (Execution Steps). Move rows `not started` -> `started (status)` -> `completed`.
@@ -51,19 +48,21 @@ Need an extra section (Risks, Decision Log, Dependencies, Glossary, Build/Deploy
 
 ## 3. Preferences
 
-*These bias toward caution over speed; for trivial tasks, use judgment.*
-
 - **Be autonomous.** Decide and execute; ask when blocked, genuinely ambiguous, or before destructive/irreversible actions.
 - **Think before coding.** State assumptions explicitly. If multiple interpretations exist, present them — don't pick silently. Surface simpler approaches and tradeoffs; push back when warranted. When something is unclear, stop, name it, and ask *before* implementing — not after the mistake.
 - **Simplicity first.** Minimum code that solves the problem, nothing speculative — no unrequested features, no abstractions for single-use code, no configurability or error handling for impossible scenarios. If 200 lines could be 50, rewrite. (Boundaries live in §6.)
-- **Surgical changes.** Every changed line traces to the request. Match existing style even if you'd do it differently; don't refactor or reformat working code. Remove only the orphans your change created; flag pre-existing dead code, don't delete it.
+- **Surgical changes.** Every changed line traces to the request. Refactor when it unblocks the task (duplicated/convoluted code in your path, or to isolate code for a test) — never speculative cleanup of code you're just passing through.
 - **Goal-driven execution.** Turn each task into a verifiable goal ("add validation" → "write tests for invalid inputs, then make them pass"). State a brief plan with a *verify* check per step and loop until verified. (Pairs with TDD; criteria live in §12.)
 - **Read before write.** Verify with data before mutating shared state.
 - **Evidence first:** problem, observations, decision, implementation.
 - **TDD by default:** cheapest failing test, minimum fix, refactor.
 - Plain words. Small steps. Reversible beats clever.
-- Commit by filename, never `git add .`. Commit before any build.
 - **Never write paragraphs.** Use diagrams, bullets, and numbered lists only — never prose blocks. Within them keep words clear and free of jargon/vocab words.
+- **Use git cleverly.**
+  - Commit often, by filename (never `git add .`)
+  - Keep commits atomic — one logical change each — with grep-searchable titles and descriptions.
+  - Optional, as useful: `git log`/`blame` to recover intent or escape churn on a bug; branch/tag a known-good state before risky work; worktrees to explore approaches in parallel; check the line-by-line diff to ground edits.
+- **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep`/`find`/`sed -n` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents.
 
 ---
 
@@ -126,7 +125,7 @@ Example:
 
 ## 8. Databases and Schemas
 
-The **primary table(s)** or any kind of relevant persistent data schemas that this plan reads or writes. For example, could be a local FS-backed circular queue, or postgres, distributed kafka, depending on the project nature. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any migration or alter's.
+The **primary table(s)** or any kind of relevant persistent data schemas that this plan reads or writes. For example, could be a local circular queue, or postgres, etc, depending on the project nature. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any migration or alter's.
 
 **`<table>`** — one-line purpose. *(new | existing)*
 
