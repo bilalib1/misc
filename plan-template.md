@@ -1,4 +1,4 @@
-# [Plan Title] - Bilal Plan Template
+# [Plan Title]
 
 One paragraph: the problem, why it matters, what this plan changes. Replace in every fork.
 
@@ -8,7 +8,7 @@ One paragraph: the problem, why it matters, what this plan changes. Replace in e
 
 **Repo layout:** `~/code` holds all repos, one directory per repo (this template lives in `~/code/misc`). Plans reference paths relative to their own repo root.
 
-Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below is numbered and **stays in every fork**. If a section doesn't apply, write `not applicable` plus one line why.
+Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below besdies its meta-description **stays in every fork**.
 
 1. How To Use This Template
 2. Maintain This Plan
@@ -40,7 +40,7 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 - Keep: decisions + *why*, paths, commands, thresholds, acceptance, rollback, next steps.
 - Drop: diary text, dead alternatives, "we tried X" narration, excessive reasoning.
 - One status table (Execution Steps). Move rows `not started` -> `started (status)` -> `completed`.
-- Project History is append-only. Keep the File List current. Every new rule needs a test, or a reason none can catch it.
+- Project History is append-only. Keep the File List current.
 
 ---
 
@@ -50,17 +50,18 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 - **Think before coding.** State assumptions explicitly. Push back against the human when warranted. If multiple interpretations exist, present them — don't pick silently. Surface simpler approaches and tradeoffs.
 - **Simplicity first.** Minimum code that solves the problem, nothing speculative — no unrequested features, no abstractions for single-use code, no configurability or error handling for impossible scenarios. If 200 lines could be 50, rewrite. (Boundaries live in §6.)
 - **Surgical changes.** Every changed line traces to the request. Refactor when it unblocks the task (duplicated/convoluted code in your path, or to isolate code for a test) — never speculative cleanup of code you're just passing through.
-- **Goal-driven execution.** Turn each task into a verifiable goal ("add validation" → "write tests for invalid inputs, then make them pass"). State a brief plan with a *verify* check per step and loop until verified. (Pairs with TDD; criteria live in §12.)
+- **Goal-driven execution.** Turn each task into a verifiable goal ("add validation" → "write tests for invalid inputs, then make them pass"). State a brief plan with a *verify* check per step and loop until verified.
 - **Read before write.** Verify with data before mutating shared state.
 - **Evidence first:** problem, observations, decision, implementation.
 - **TDD by default:** cheapest failing test, minimum fix, refactor.
 - Plain words. Small steps. Reversible beats clever.
-- **Never write paragraphs.** Use diagrams, bullets, and numbered lists only — never prose blocks. Within them keep words clear and free of jargon/vocab words.
+- **Be succinct always.** Both in this doc and in conversation, prefer bullets, numbered lists, and diagrams over paragraphs. Avoid jargon/vocab words.
 - **Use git cleverly, especially for debugging.**
   - Commit often, by filename (never `git add .`); keep commits atomic — one logical change each — with grep-searchable titles and descriptions.
   - *Debug with history:* `git log`/`blame` to recover intent, `bisect` to find the breaking commit, `reflog` to recover lost state, diff to ground edits.
   - *As useful:* branch/tag a known-good state before risky work; worktrees to explore approaches in parallel.
-- **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep -A,B,C`/`find`/`sed/tail/head` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents. Write and checkin python scripts to do tasks we may want to repeat rather than running strings of adhoc commands.
+- **Guard your context.** It degrades as it fills, so spend it deliberately. Reach for `grep -C`/`find`/`sed/tail/head` to pull only the lines you need instead of reading large files or docs whole; delegate big searches to subagents.
+- Write python scripts to do tasks we may want to repeat rather than running strings of adhoc commands.
 - Delegate all long-running tasks to subagents so as to keep main chat unblocked.
 
 ---
@@ -93,7 +94,7 @@ Boundaries so scope does not creep. **5 bullets or fewer.** Each: what we delibe
 
 ## 7. Architecture
 
-How the pieces fit: components, data flow, key interfaces, where this plugs in. A small ASCII diagram beats a paragraph. Note the boundaries we must not touch.
+How the pieces fit: components, data flow, key interfaces, where this plugs in. This section is mostly an ASCII diagram with some words.
 
 **ASCII diagram rules:** flow top→bottom on a centered spine (`▼` forward, `▲` back-edges); short label per box, detail on the edges beside each `│`; keep it narrow (≤~50 cols);
 
@@ -124,7 +125,9 @@ Example:
 
 ## 8. Databases and Schemas
 
-The **primary table(s)** or any kind of relevant persistent data schemas that this plan reads or writes. For example, could be a local circular queue, or postgres, etc, depending on the project nature. State up front whether it **already exists** (we're using/extending it) or this doc **creates it**, and call out any migration or alter's.
+(optional)
+
+The **primary table(s)** or any kind of relevant persistent data schemas that this plan reads or writes. For example, could be a local circular queue, or postgres, etc, depending on the project nature. Call out any new db's, migrations, alter's, writers, readers.
 
 **`<table>`** — one-line purpose. *(new | existing)*
 
@@ -149,7 +152,7 @@ Briefly write **every key algorithm, loop, and transformation step by step** as 
 
 ## 10. Data Snippets
 
-*(if relevant — otherwise `not applicable`)*
+(optional)
 
 Ground the work in real shapes. **Include 3 examples** of whatever is central — a JSON payload, an API request/response, a dataset row, ML model in/outputs. **~10 lines each at most** (trim with `...`). Prefer **real queried examples** over invented ones.
 
@@ -171,7 +174,7 @@ The agent's running queue — what's blocked on the human or undecided. Read fir
 
 ### A. E2E / Human Test Plan
 
-One code block with the exact end-to-end steps a human runs to confirm it works, with expected outputs (counts, IDs, latencies, screenshots). Followable without questions.
+1-3 copy-pastable code blocks with the end-to-end steps a human can run to confirm it works, with expected outputs (counts, IDs, latencies, screenshots).
 
 ### B. Acceptance Criteria
 
@@ -206,7 +209,7 @@ Index of every relevant path or dir: source files touched, data, related docs/pl
 
 ## 15. Long Jobs / Backfill
 
-*(optional — default `not applicable`)*
+*(optional)*
 
 Any job over ~5 min, bulk writes, or recomputes.
 
@@ -217,7 +220,7 @@ Any job over ~5 min, bulk writes, or recomputes.
 
 ## 16. Rollback Plan
 
-*(optional — `not applicable` if trivially reversible)*
+(optional)
 
 Exact steps + commands to undo a shipped change, and how to tell it worked.
 
@@ -225,7 +228,7 @@ Exact steps + commands to undo a shipped change, and how to tell it worked.
 
 ## 17. Postmortems
 
-*(default `not applicable`; the moment a trigger fires, write the entry in the same turn)*
+(optional)
 
 Write a postmortem in `postmortems/` for any event **expensive in money, time, or churn.** Triggers:
 
@@ -233,9 +236,7 @@ Write a postmortem in `postmortems/` for any event **expensive in money, time, o
 - **Costly:** real money (paid API, GPU/CPU compute) or wall-clock time (long runs, big backfills, long waits).
 - **High churn:** many repeated failed attempts, reverts, or commits before it worked.
 
-Each writeup: severity, cost (\$ + time), impact, root cause, UTC timeline, why it slipped through, follow-ups, lessons. Link the fix commit. Add the cheapest regression test/guardrail or say why none can catch it. Add a Project History bullet.
-
-not applicable — no triggering event yet.
+Each writeup: severity, cost (\$ + time), impact, root cause, UTC timeline, why it slipped through, follow-ups, lessons. Link the fix commit. Add the regression test/guardrail or say why none can catch it. Add a Project History bullet.
 
 ---
 
