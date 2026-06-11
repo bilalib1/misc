@@ -193,6 +193,8 @@ def build_search_url(make: str, model_slug: str, color_slug: str) -> str:
         ("year_min", YEAR_MIN),
         ("year_max", 2026),
         ("exterior_color_slugs[]", color_slug),
+        ("fuel_slugs[]", "hybrid"),
+        ("fuel_slugs[]", "plug_in_hybrid"),
         ("zip", ZIP),
         ("maximum_distance", DISTANCE),
         ("page_size", 50),
