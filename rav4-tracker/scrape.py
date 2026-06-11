@@ -37,7 +37,6 @@ from car_search import (
 )
 from browser_scraper import (
     scrape_carmax, scrape_carvana,
-    filter_listings, _model_has_any_leather,
     _hide_chromium,
 )
 
@@ -511,28 +510,37 @@ def _ingest_browser_sources():
         interior = c.get("interior", "")
         if not has_acceptable_interior(interior):
             continue
-        model = c.get("model", "").lower()
+
+        # Re-parse model/trim from the listing title — the title is the most
+        # reliable source across all providers. Carvana's LD+JSON trim field is
+        # broken: the regex that extracts it returns "Hybrid" (the fuel-type word
+        # in the model name) instead of the actual trim level. Parsing from the
+        # full title string ("2024 Toyota RAV4 Hybrid XLE Premium") gives us the
+        # correct trim.
+        title = c.get("title", "")
+        model_parsed, trim_parsed = _parse_model_trim(title)
+        model = model_parsed or c.get("model", "").lower()
+        trim  = trim_parsed.lower() if trim_parsed else c.get("trim", "").lower()
+
         if _cs.is_blocked_model(model):
             continue
-        trim  = c.get("trim", "").lower()
+
         source = c.get("source", "")
 
-        # CarMax LD+JSON provides `interior_type` ("Leather Seats", "Cloth Seats", …).
-        # Use confirms_leather() on that first — it's ground truth from the listing.
-        # Fall back to trim-level check only when the field is absent/ambiguous.
+        # CarMax LD+JSON provides `interior_type` — use confirms_leather() first
+        # as it is ground truth from the listing itself.
         interior_type = c.get("interior_type", "")
         leather_result = confirms_leather(interior_type)
         if leather_result is False:
-            continue   # CarMax says "Cloth Seats" — hard reject
+            continue   # explicit "Cloth Seats" — hard reject
         if leather_result is None:
-            # No material text: fall back to trim-level check
-            if source == "carvana":
-                if not _model_has_any_leather(model, _cs):
-                    continue
-            else:
-                if not has_leather(model, trim):
-                    continue
-        # leather_result is True → confirmed leather, skip trim check
+            # No seat-material text: require a confirmed leather trim by spec.
+            # Applied uniformly to all sources — no model-level fallback.
+            # Listings with unidentifiable or cloth trims are skipped; it is
+            # better to miss a few cars than to send cloth interiors.
+            if not has_leather(model, trim):
+                continue
+        # leather_result is True → confirmed leather from listing text
 
         miles = int(c.get("miles") or 0)
         price = int(c.get("price") or 0)
