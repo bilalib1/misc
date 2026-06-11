@@ -1,0 +1,23 @@
+name: rav4-poll
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 min (GitHub may delay under load)
+  workflow_dispatch: {}       # lets you trigger a run by hand
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rav4-tracker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python poll.py
+        env:
+          GMAIL_TOKEN_JSON: ${{ secrets.GMAIL_TOKEN_JSON }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

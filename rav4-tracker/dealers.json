@@ -1,0 +1,12 @@
+[
+  {"name": "Longo Toyota (El Monte)",        "region": "LA",  "email": ""},
+  {"name": "Toyota of Downtown LA",          "region": "LA",  "email": ""},
+  {"name": "Toyota Santa Monica",            "region": "LA",  "email": ""},
+  {"name": "Toyota of Hollywood",            "region": "LA",  "email": ""},
+  {"name": "Toyota of Glendale",             "region": "LA",  "email": ""},
+  {"name": "San Francisco Toyota",           "region": "SF",  "email": ""},
+  {"name": "City Toyota (Daly City)",        "region": "SF",  "email": ""},
+  {"name": "Toyota of Berkeley",             "region": "SF",  "email": ""},
+  {"name": "Toyota Sunnyvale",               "region": "SF",  "email": ""},
+  {"name": "Stevens Creek Toyota (San Jose)","region": "SF",  "email": ""}
+]

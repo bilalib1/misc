@@ -21,6 +21,17 @@ I already emailed one Toyota dealership asking for a RAV4 quote from my Gmail (`
   - Must survive my laptop being closed → needs a *persistent* host, not a local script.
   - Must read + send as `garbanzobilson@gmail.com` → needs durable Gmail auth (offline OAuth refresh token), not a browser session.
   - Low volume, low urgency: polling every ~15 min is plenty.
+  - Secrets never go in the repo. Local copies live in `~/secrets/rav4-tracker/` (chmod 700); the cloud poller reads them from GitHub Actions secrets.
+
+### Prerequisites — what `setup.sh` will ask you for
+
+Run **one** script: `~/code/misc/rav4-tracker/setup.sh`. It automates everything except three things only you can do. It prompts for each, in order:
+
+1. **Google OAuth client file.** You make it once in the Google Cloud Console: create a project → enable Gmail API → OAuth consent screen set to *External* with `garbanzobilson@gmail.com` added as a **test user** (keeps it unverified-but-working) → create a *Desktop app* OAuth client → download the JSON. The script then opens a browser for you to approve a **scoped** grant (`gmail.modify` = read/send/label, nothing destructive) and stores the resulting offline refresh token at `~/secrets/rav4-tracker/token.json`. This token *is* the "authorized, limited, personal-scripting" credential — revocable anytime at myaccount.google.com → Security → Third-party access.
+2. **Telegram bot token.** In Telegram, message `@BotFather` → `/newbot`. Paste the token; the script then asks you to message your new bot once and auto-captures your `chat_id`.
+3. **The 10 dealer emails.** The script opens `dealers.json` (pre-filled with 10 real LA/Bay-Area Toyota dealership names) for you to paste each dealership's internet-sales email. It refuses to send while any are blank.
+
+It also: builds a Python venv, runs the unit tests, pulls your already-sent RAV4 email as the template (you review it), sends a **test** copy to yourself, waits for you to type `SEND` before the real blast, then wires the GitHub Actions poller via `gh`.
 
 ---
 
@@ -28,17 +39,17 @@ I already emailed one Toyota dealership asking for a RAV4 quote from my Gmail (`
 
 | #  | Task                                                                 | Status      |
 | -- | ------------------------------------------------------------------- | ----------- |
-| 1  | Decide persistent host (see §11 Q1)                                  | not started |
-| 2  | Gmail API OAuth: GCP project, consent, offline refresh token        | not started |
-| 3  | Pull the already-sent RAV4 email body from Sent folder              | not started |
-| 4  | Gather 10 dealership emails (LA + SF Bay) — see §11 Q3              | not started |
-| 5  | Create Telegram bot (BotFather), capture token + my chat_id         | not started |
-| 6  | `send.py` — send the reused body to all 10 dealers via Gmail API    | not started |
-| 7  | `poll.py` — fetch replies, extract prices, check threshold, notify  | not started |
-| 8  | Price-extraction heuristic + range filter (see §9, §11 Q2)          | not started |
-| 9  | Wire poller to chosen scheduler; store secrets                      | not started |
-| 10 | Idempotent "already notified" guard (Gmail label)                   | not started |
-| 11 | Dry-run end-to-end with a test recipient before real blast          | not started |
+| 1  | Decide persistent host                                               | completed — GitHub Actions cron, every 15 min |
+| 2  | Gmail OAuth scripts (consent flow → token in ~/secrets)             | started — code done (`oauth_setup.py`); you run `setup.sh` to consent |
+| 3  | Pull already-sent RAV4 body                                          | started — `prepare_message.py` done; runs during setup |
+| 4  | 10 dealership emails (LA + SF Bay)                                   | started — names scaffolded in `dealers.json`; you fill emails in setup |
+| 5  | Telegram bot token + chat_id capture                                 | started — `telegram_setup.py` done; you run during setup |
+| 6  | `send.py` — blast body to dealers (test / dry-run / real)            | completed — written, imports clean |
+| 7  | `poll.py` — replies → price → threshold → notify                    | completed — written, imports clean |
+| 8  | Price heuristic + range filter                                       | completed — `price.py`, 7/7 unit tests pass |
+| 9  | Scheduler wiring + secret plumbing                                   | completed — `rav4-poll.yml` + `setup.sh` (`gh secret set`) |
+| 10 | Idempotent "already notified" guard                                  | completed — Gmail label `rav4-notified` |
+| 11 | Dry-run + test-recipient gate before real blast                      | completed — `--test=` then typed `SEND` gate in `setup.sh` |
 
 ---
 
@@ -119,16 +130,20 @@ I already emailed one Toyota dealership asking for a RAV4 quote from my Gmail (`
 
 ## 11. Open Questions / Decisions Needed
 
-- **Q1 — Persistent host (the core question).** Three options:
-  - **(A) GitHub Actions scheduled workflow [recommended].** Free, truly persistent (runs in the cloud regardless of my laptop), I already have `github.com/bilalib1/misc`. Tokens go in repo Secrets. Cron granularity ~5–15 min (delays possible but fine here). State stays in Gmail (the `rav4-notified` label), so no commit-back needed. Lowest setup, zero cost.
-  - **(B) Cheap always-on box** — Fly.io free tier / $5 droplet / Raspberry Pi with `cron`. Most reliable timing, full control, local SQLite if wanted. Costs a little setup/$, but no GitHub-runner quirks.
-  - **(C) Local macOS `launchd`.** Simplest to write, but **not persistent** — dies when the laptop sleeps. Fails the main requirement; listed only to reject.
-  - **Recommendation: A.** Pick B only if cron timing reliability turns out to matter. Need your nod.
-- **Q2 — Which price counts when a reply has several dollar figures?** Plan uses keyword-near-amount, else max-in-range (§9.6). Is "out the door / total" the number you care about, or base selling price? This changes the heuristic.
-- **Q3 — Where do the 10 dealer emails come from?** Do you hand me the list, or should I research LA + SF Bay Toyota dealers' internet-sales emails myself? Wrong/generic addresses (e.g. `info@`) lower reply rates.
-- **Q4 — Does "five respond" mean five *replies*, or five replies *with a parseable price*?** Plan assumes the latter (we need prices to compute a min). Confirm.
-- **Q5 — OAuth consent friction.** Gmail send/read scopes are "restricted"; an unverified personal app still works for my own account via the test-user path. OK to set up a throwaway GCP project for this?
-- **Q6 — Send cadence.** Fire all 10 at once, or stagger? All-at-once is simpler; staggering looks less bulk-y to dealer spam filters.
+Q1–Q6 are now **decided** (kept for the record). The only thing still on you is the dealer emails, handled inside `setup.sh`.
+
+**Still on you:**
+
+- **Dealer emails.** `dealers.json` has 10 real dealership *names*; you paste each internet-sales email when `setup.sh` opens the file. (Couldn't source these reliably myself — wrong addresses would waste the whole blast.)
+
+**Decided:**
+
+- **Q1 host → GitHub Actions cron** (free, persistent, uses the existing `bilalib1/misc` repo; state lives in the Gmail `rav4-notified` label, so no DB). Local secrets in `~/secrets/rav4-tracker/`.
+- **Q2 price → keyword-anchored, after-the-label, range-filtered** (§9). Picks the figure following "out the door / total"; falls back to largest in $15k–$80k. 7/7 unit tests.
+- **Q3 dealers →** names scaffolded; you confirm emails (above).
+- **Q4 "five respond" →** five replies *with a parseable price* (`MIN_REPLIES = 5` in `poll.py`).
+- **Q5 OAuth →** scoped `gmail.modify` token via a test-user GCP project; token stored in `~/secrets`, not the repo. *(Considered a Gmail App Password + SMTP/IMAP to skip the GCP project — rejected: an app password grants full mailbox access, the opposite of "limited". Scoped OAuth is the right "authorized limited personal scripting" credential.)*
+- **Q6 cadence →** all 10, 2-second spacing (`send.py`).
 
 ---
 
@@ -166,11 +181,23 @@ I already emailed one Toyota dealership asking for a RAV4 quote from my Gmail (`
 
 ## 14. File List
 
-- `~/code/misc/plans/2026-06-10-rav4-dealership-price-tracker.md` — this plan.
-- `send.py` — *(to create)* one-shot blast to 10 dealers.
-- `poll.py` — *(to create)* scheduled reply-poller + notifier.
-- `dealers.json` — *(to create)* the 10 dealers: name, email, region, sent_msg_id.
-- `.github/workflows/rav4-poll.yml` — *(to create, if host = A)* cron that runs `poll.py`.
+All code under `~/code/misc/rav4-tracker/` unless noted.
+
+- `../plans/2026-06-10-rav4-dealership-price-tracker.md` — this plan.
+- `setup.sh` — the one script you run; orchestrates all of the below.
+- `paths.py` — secret locations (`~/secrets/rav4-tracker/`, env-overridable).
+- `config.py` — loads Gmail + Telegram creds (local files or Actions env).
+- `oauth_setup.py` — one-time browser consent → `token.json`.
+- `telegram_setup.py` — capture bot token + chat_id → `telegram.json`.
+- `prepare_message.py` — pull your sent RAV4 email → `message.json`.
+- `price.py` — pick one price per reply (the testable core).
+- `test_price.py` — 7 unit cases; run with `python test_price.py`.
+- `send.py` — blast (`--test=`, `--dry-run`, real).
+- `poll.py` — replies → price → ≥5 → Telegram → label.
+- `dealers.json` — 10 dealership names; you fill emails. *(committed)*
+- `requirements.txt`, `.gitignore`.
+- `~/code/misc/.github/workflows/rav4-poll.yml` — cron poller (every 15 min).
+- `~/secrets/rav4-tracker/` — token.json, client_secret.json, telegram.json, message.json. *(never committed)*
 
 ---
 
@@ -183,3 +210,4 @@ Not applicable yet.
 ## 18. Project History
 
 - **2026-06-10** — Plan drafted. Core open question is the persistent host (recommending GitHub Actions cron). No code yet.
+- **2026-06-10** — Built the whole system: `rav4-tracker/` scripts + price logic (7/7 tests) + GitHub Actions poller + one `setup.sh` that prompts for the 3 manual pieces (GCP OAuth client, Telegram bot, dealer emails). Secrets relocated to `~/secrets/rav4-tracker/` (none in repo) per request. All modules import clean in a venv. Not yet run end-to-end — waiting on you to run `setup.sh` and supply consent + bot token + emails.
