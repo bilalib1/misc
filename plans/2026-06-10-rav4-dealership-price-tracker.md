@@ -227,12 +227,12 @@ Procedure:
 3. **Filter** —
    - **Location:** greater LA / SoCal only; drop out-of-state and far (San Diego/Vegas/Fresno).
    - **Silver synonyms pass:** silver *and* grey-family names count — Platinum Graphite, Steel Gray, Magnetic/Celestial/Silky/Lunar/Atomic/Shimmering Silver, Chrome, Stardust, Titanium, Cement (`car_search.is_silver`). Drop black/white/blue/red.
-   - **Leather only:** keep trims with leather or leather-like (SofTex/SynTex/NuLuxe); drop base cloth (RAV4 LE/XLE, CR-V Sport, Sorento S/LX). Map in `car_search.LEATHER_TRIMS` (`has_leather`).
+   - **Leather only — verify by TRIM SPEC, not the listing's tag:** a leather/cloth decision must come from the **manufacturer's standard spec for that trim + model year** (check a reliable source — manufacturer build site, Edmunds, U.S. News, Cars.com research). Do **not** trust a listing's "Leather Seats" feature flag; dealers set those loosely. Keep trims whose *standard* seat is leather or leather-like (SofTex/SynTex/H-Tex/NuLuxe); drop base cloth. Encoded in `car_search.LEATHER_TRIMS` (`has_leather`) — re-confirm against specs per model year before trusting it, and fix the map when a year differs. **Worked example:** the RAV4 Hybrid **SE** ships with *fabric* sport seats (not SofTex), so SE listings are dropped even when tagged "Leather Seats" — only XLE Premium / XSE / Limited have SofTex.
 4. **Verify finalists** — open each shortlisted detail page to confirm it's still active and the price / mileage / leather are as listed (results pages don't show interior material). Never text an unverified listing.
 5. **Rank by value** — price weighed against year, mileage, trim. Best deal = #1.
 6. **Send** — `python car_search.py send shortlist.json` (or `send_ranked()`): one brief numbered line each, `view` hyperlinked to the listing, best first.
 
-First run (2026-06-10): texted a verified top 10 (RAV4 Hybrid XLE Premium / SE, Kia Sorento Hybrid EX / SX Prestige, Tucson Hybrid Limited, CR-V Hybrid Sport Touring), all silver/grey + leather, $27,995–$38,288, LA-area.
+First run (2026-06-10): texted a verified top 10 — RAV4 Hybrid XLE Premium / XSE, Kia Sorento Hybrid EX / SX Prestige, Tucson Hybrid Limited, CR-V Hybrid Sport Touring — all silver/grey + leather (trim-spec-verified), $27,995–$39,785, LA-area. (Initial pass mistakenly included two RAV4 SEs off the dealer's leather tag; corrected after checking the trim spec — SE is fabric.)
 
 ---
 

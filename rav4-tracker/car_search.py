@@ -54,13 +54,16 @@ SILVER_SYNONYMS = (
     "shimmering", "cement", "titanium",
 )
 
-# Trims that ship with leather or leather-like (SofTex/SynTex/NuLuxe) seats.
-# Anything not listed (base cloth trims like RAV4 LE/XLE, CR-V Sport) is dropped.
+# Trims whose STANDARD seat is leather or leather-like (SofTex/SynTex/H-Tex/
+# NuLuxe). Verified against authoritative trim specs (manufacturer / Edmunds /
+# U.S. News), NOT a listing's "Leather Seats" tag, which dealers set loosely.
+# Anything not listed (RAV4 LE/XLE/SE, CR-V Sport, Tucson SEL, Sorento S/LX) is
+# cloth and gets dropped. Re-check specs per model year before trusting this.
 LEATHER_TRIMS = {
-    "rav4 hybrid": {"xle premium", "se", "xse", "limited"},
-    "venza": {"le", "xle", "limited"},          # SofTex standard on all
-    "cr-v hybrid": {"ex-l", "sport touring"},
-    "tucson hybrid": {"limited", "sel convenience"},
+    "rav4 hybrid": {"xle premium", "xse", "limited"},   # SE is FABRIC — excluded
+    "venza": {"le", "xle", "limited"},                   # SofTex standard on all
+    "cr-v hybrid": {"ex-l", "sport-l", "sport touring"},
+    "tucson hybrid": {"limited", "n line"},
     "santa fe hybrid": {"limited", "calligraphy"},
     "sportage hybrid": {"ex", "sx", "sx prestige", "x-line prestige", "x-pro prestige"},
     "sorento hybrid": {"ex", "sx", "sx prestige"},
