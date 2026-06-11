@@ -77,7 +77,7 @@ COLOR_SLUGS = ["silver", "gray"]
 # Root words that imply a light/neutral exterior (silver, gray, white, etc.).
 # White is included — buyer may want silver OR white since both are "light."
 SILVER_ROOTS = (
-    "silver", "gray", "grey", "chrome", "platinum", "titanium",
+    "silver", "gray", "grey", "chrome", "platinum",
     "stardust", "sterling",
 )
 # Strings that veto a color regardless of root-word matches — dark/blue-leaning.
@@ -210,6 +210,19 @@ def search_urls():
     for make, model_slug in MODELS:
         for color in COLOR_SLUGS:
             yield build_search_url(make, model_slug, color)
+
+
+# Models excluded regardless of other filters — sedans/non-SUVs that slipped
+# into LEATHER_TRIMS for reference but don't fit the buyer's "SUV/crossover" requirement.
+BLOCKED_MODELS = {
+    "elantra",
+    "elantra hybrid",
+}
+
+
+def is_blocked_model(model: str) -> bool:
+    m = (model or "").lower().strip()
+    return any(b in m for b in BLOCKED_MODELS)
 
 
 # Dealers/sellers whose sites hard-block automated VIN verification (Akamai 403),

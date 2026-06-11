@@ -30,12 +30,14 @@ import car_search as _cs
 from car_search import (
     YEAR_MIN, PRICE_MIN, PRICE_MAX, MILES_MAX,
     is_silver, has_acceptable_interior, has_leather, confirms_leather,
+    is_blocked_model,
     search_urls,
     UNVERIFIABLE_SELLERS, SOLD_MARKERS,
 )
 from browser_scraper import (
     scrape_carmax, scrape_carvana,
     filter_listings, _model_has_any_leather,
+    _hide_chromium,
 )
 
 _UA = (
@@ -95,29 +97,63 @@ def _parse_model_trim(title):
 # ---------------------------------------------------------------------------
 
 async def _fetch_search_page(page, url):
-    """Return listing dicts from one Cars.com search-results URL."""
-    try:
-        await page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
-        # Cars.com uses [data-listing-id] on each result LI
-        await page.wait_for_selector("[data-listing-id]", timeout=20_000)
-    except Exception as e:
-        print(f"    (skip: {type(e).__name__})")
-        return []
-
-    cards = await page.query_selector_all("[data-listing-id]")
+    """Return listing dicts from one Cars.com search-results URL, paginating if needed."""
+    PAGE_SIZE = 50   # Cars.com default; if a full page loads, there may be more
+    seen_urls: set = set()
     listings = []
-    for card in cards:
+    page_num = 1
+
+    while True:
+        paged_url = url if page_num == 1 else f"{url}&page={page_num}"
         try:
-            lst = await _extract_card(card)
-        except Exception:
-            continue
-        if lst:
-            listings.append(lst)
+            await page.goto(paged_url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+            await page.wait_for_selector("[data-listing-id]", timeout=20_000)
+        except Exception as e:
+            if page_num == 1:
+                print(f"    (skip: {type(e).__name__})")
+            break
+
+        # On page 1, read the total result count to know if we need more pages
+        if page_num == 1:
+            body_text = await page.inner_text("body")
+            m = re.search(r"([\d,]+)\s+results?", body_text[:4000], re.I)
+            total = int(m.group(1).replace(",", "")) if m else None
+            if total and total > PAGE_SIZE:
+                print(f"    ({total} total results — will paginate)")
+
+        cards = await page.query_selector_all("[data-listing-id]")
+        new_this_page = 0
+        for card in cards:
+            try:
+                lst = await _extract_card(card)
+            except Exception:
+                continue
+            if lst and lst["url"] not in seen_urls:
+                seen_urls.add(lst["url"])
+                listings.append(lst)
+                new_this_page += 1
+
+        # Stop if: no new results, fewer than PAGE_SIZE (last page), or we have everything
+        if new_this_page == 0:
+            break
+        if new_this_page < PAGE_SIZE:
+            break
+        if total and len(listings) >= total:
+            break
+        page_num += 1
+
+    if page_num > 1:
+        print(f"    (fetched {page_num} pages → {len(listings)} listings)")
     return listings
 
 
 async def _extract_card(card):
-    """Parse a Cars.com [data-listing-id] element via innerText + link href."""
+    """Parse a Cars.com [data-listing-id] element.
+
+    data-vehicle-details is a JSON blob on every card with exteriorColor, VIN,
+    price, mileage, trim, make, model, year — far more reliable than scraping
+    innerText or hitting Cloudflare-blocked detail pages.
+    """
     link = await card.query_selector("a[href*='vehicledetail']")
     if not link:
         return None
@@ -125,16 +161,31 @@ async def _extract_card(card):
     url = href if href.startswith("http") else "https://www.cars.com" + href
     if "/vehicledetail/" not in url:
         return None
-    url = url.split("?")[0]   # drop attribution params
+    url = url.split("?")[0]
 
     title = (await link.inner_text()).strip()
     title = re.sub(r"^(Used|Certified( Pre-Owned)?)\s+", "", title)
 
-    # Parse structured data from the card's plain text
-    text = await card.inner_text()
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    # Primary: structured JSON in data-vehicle-details attribute
+    details = {}
+    raw_details = await card.get_attribute("data-vehicle-details") or ""
+    if raw_details:
+        try:
+            details = json.loads(raw_details)
+        except Exception:
+            pass
 
-    price, price_text, miles, dealer, city = None, "", None, "", ""
+    price  = int(details["price"])   if details.get("price")   else None
+    miles  = int(details["mileage"]) if details.get("mileage") else None
+    ext_color = (details.get("exteriorColor") or "").lower()
+    vin    = details.get("vin", "")
+
+    # Fallback: parse innerText for price/miles/city when card JSON is missing them
+    text  = await card.inner_text()
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    price_text = f"${price:,}" if price else ""
+    dealer, city = "", ""
+
     for ln in lines:
         if not price and "$" in ln and "/mo" not in ln:
             price = _parse_price(ln)
@@ -145,7 +196,6 @@ async def _extract_card(card):
         if m and not city:
             city = m.group(1).strip()
 
-    # Dealer is typically the line just before the city line
     for i, ln in enumerate(lines):
         if re.search(r"[A-Za-z ]+,\s*CA", ln) and i > 0:
             candidate = lines[i - 1]
@@ -161,22 +211,30 @@ async def _extract_card(card):
         "miles": miles,
         "dealer": dealer,
         "city": city,
-        "ext_color": "",  # filled in by _fetch_detail
+        "ext_color": ext_color,
         "interior": "",
-        "vin": "",
-        "verified": False,
+        "vin": vin,
+        "verified": bool(vin),  # VIN from card JSON is sufficient
     }
 
 
-async def _fetch_detail(page, listing):
-    """Populate VIN + color from the Cars.com detail page.
+_CLOUDFLARE_MARKERS = ("just a moment", "checking your browser", "challenge-platform")
 
-    Marks verified=True if the page loads and shows no sold markers — we skip
-    the slow dealer-site cross-check since the user clicks through anyway.
+
+async def _fetch_detail(page, listing):
+    """Attempt to populate interior color + sold-check from the Cars.com detail page.
+
+    VIN and exterior color are now pulled from data-vehicle-details on the search card,
+    so this is only needed for interior color and sold-marker detection.
+    Skips silently when Cloudflare blocks the page.
     """
     try:
         await page.goto(listing["url"], wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         body = await page.content()
+        # Cloudflare challenge — no car data available, skip without modifying listing
+        if any(m in body.lower() for m in _CLOUDFLARE_MARKERS):
+            listing["detail_error"] = "cloudflare"
+            return
         if any(m in body.lower() for m in SOLD_MARKERS):
             listing["gone"] = True
             return
@@ -317,13 +375,15 @@ async def _verify_vin(page, listing):
 # ---------------------------------------------------------------------------
 
 def _score(listing):
-    """Lower = better quality. Year-dominant (newer = better), then mileage.
-    RAV4 Hybrid gets a priority boost — buyer's target model."""
-    year = _parse_year(listing.get("title", "")) or YEAR_MIN
+    """Lower = better value. Year dominant; mileage secondary; price tiebreaker.
+    RAV4 Hybrid gets a priority boost — buyer's primary target.
+    Works per price bucket so price differences within a narrow range still matter."""
+    year  = _parse_year(listing.get("title", "")) or YEAR_MIN
     miles = listing.get("miles") or MILES_MAX
+    price = listing.get("price") or PRICE_MAX
     model, _ = _parse_model_trim(listing.get("title", ""))
     priority = -3000 if model == "rav4 hybrid" else 0
-    return -(year - 2020) * 2000 + miles * 0.3 + priority
+    return -(year - 2020) * 2000 + miles * 0.3 + price * 0.05 + priority
 
 
 def _make(listing):
@@ -399,6 +459,8 @@ def _ingest_browser_sources():
         if not has_acceptable_interior(interior):
             continue
         model = c.get("model", "").lower()
+        if _cs.is_blocked_model(model):
+            continue
         trim  = c.get("trim", "").lower()
         source = c.get("source", "")
 
@@ -421,6 +483,10 @@ def _ingest_browser_sources():
 
         miles = int(c.get("miles") or 0)
         price = int(c.get("price") or 0)
+        if price and not (PRICE_MIN <= price <= PRICE_MAX):
+            continue
+        if miles and miles > MILES_MAX:
+            continue
         out.append({
             "title": c["title"],
             "url": c["url"],
@@ -455,9 +521,10 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
-            headless=False,
+            headless=False,  # Cloudflare/Akamai block headless
             args=["--disable-blink-features=AutomationControlled"],
         )
+        _hide_chromium()
         ctx = await browser.new_context(
             user_agent=_UA,
             viewport={"width": 1280, "height": 800},
@@ -479,7 +546,9 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
                     raw.append(lst)
         print(f"[scrape] {len(raw)} unique raw listings")
 
-        # -- Step 2: basic filters (year / price / miles / color / leather) --
+        # -- Step 2: basic filters (year / price / miles / color / model / leather) --
+        # ext_color is now populated from data-vehicle-details JSON on the card,
+        # so the color filter is reliable here rather than deferred to detail pages.
         candidates = []
         for lst in raw:
             year = _parse_year(lst["title"])
@@ -492,17 +561,24 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
             if lst["ext_color"] and not is_silver(lst["ext_color"]):
                 continue
             model, trim = _parse_model_trim(lst["title"])
+            if model and is_blocked_model(model):
+                continue
             if model and not has_leather(model, trim):
                 continue
             candidates.append(lst)
         print(f"[scrape] {len(candidates)} after basic filters")
 
-        # -- Step 3: detail pages (VIN, interior, confirm color) --
-        for i, lst in enumerate(candidates, 1):
+        # -- Step 3: detail pages — only for listings missing VIN from card data.
+        # Cards with VIN already have ext_color from data-vehicle-details; detail pages
+        # are Cloudflare-blocked for Cars.com anyway, so skip them when not needed.
+        needs_detail = [lst for lst in candidates if not lst.get("vin")]
+        has_card_vin = [lst for lst in candidates if lst.get("vin")]
+        print(f"[scrape] {len(has_card_vin)} have VIN from card, {len(needs_detail)} need detail fetch")
+        for i, lst in enumerate(needs_detail, 1):
             if _time.time() > deadline:
                 print(f"[scrape] deadline hit during detail phase — skipping remaining")
                 break
-            print(f"  detail [{i}/{len(candidates)}] {lst['title'][:60]}")
+            print(f"  detail [{i}/{len(needs_detail)}] {lst['title'][:60]}")
             await _fetch_detail(page, lst)
             if lst.get("gone"):
                 print("    -> sold (detail page)")
@@ -511,12 +587,15 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
                 lst["color_fail"] = True
             if lst["interior"] and not has_acceptable_interior(lst["interior"]):
                 lst["interior_fail"] = True
-            # Hard leather check using actual seat-material text from the spec list.
-            # confirms_leather() returns True/False/None; None means fall back to trim.
             leather_result = confirms_leather(lst.get("interior", ""))
             if leather_result is False:
-                lst["leather_fail"] = True   # spec list says "Cloth" — hard reject
-            # (leather_result True or None keeps the candidate; trim already passed)
+                lst["leather_fail"] = True
+
+        # Interior check for card-VIN listings (interior is empty — pass through;
+        # trim-spec leather check already applied in step 2)
+        for lst in has_card_vin:
+            if lst["interior"] and not has_acceptable_interior(lst["interior"]):
+                lst["interior_fail"] = True
 
         finalists = [
             lst for lst in candidates
@@ -526,9 +605,6 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
             and not lst.get("leather_fail")
         ]
         print(f"[scrape] {len(finalists)} finalists after detail checks")
-
-        # Step 4: VIN verification skipped — detail page load is sufficient proof
-        # (dealer-site cross-check was too slow and bot-blocked anyway)
 
         await browser.close()
 
@@ -545,8 +621,13 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
         verified.append(blst)
     print(f"[scrape] {len(verified)} total after merging CarMax+Carvana")
 
-    # -- Step 6: rank + select top 10 --
-    top = _select_diverse(verified, top_n=TOP_N, min_makes=MIN_MAKES)
+    # -- Step 6: split into two price buckets, top 5 each --
+    under30 = [l for l in verified if (l.get("price") or 0) <  30_000]
+    over30  = [l for l in verified if (l.get("price") or 0) >= 30_000]
+    top_under = _select_diverse(under30, top_n=5, min_makes=3, max_per_make=2)
+    top_over  = _select_diverse(over30,  top_n=5, min_makes=3, max_per_make=2)
+    top = top_under + top_over
+    print(f"[scrape] {len(top_under)} under $30k / {len(top_over)} $30-40k")
 
     # -- Step 7: send / output --
     def _brief(lst, i):
@@ -557,6 +638,18 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
         title = lst["title"].replace("Used ", "").replace("Certified ", "")
         return f'{i}. {title} — {price_str} | {miles_str}{color_part} — <a href="{lst["url"]}">view</a>'
 
+    def _build_msg(top_under, top_over):
+        lines = []
+        if top_under:
+            lines.append("Under $30k:")
+            lines += [_brief(lst, i) for i, lst in enumerate(top_under, 1)]
+        if top_over:
+            if top_under:
+                lines.append("")
+            lines.append("$30–40k:")
+            lines += [_brief(lst, i) for i, lst in enumerate(top_over, 1)]
+        return "\n".join(lines)
+
     if out_file:
         rows = [{"title": l["title"], "price": l.get("price_text",""), "miles": f"{l['miles']//1000}k mi",
                  "url": l["url"], "vin": l.get("vin",""), "verified": True} for l in top]
@@ -564,15 +657,13 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
             json.dump(rows, f, indent=2)
         print(f"[scrape] wrote {len(rows)} listings → {out_file}")
     elif dry_run:
-        print(f"\nDry run — top {len(top)}:")
-        for i, lst in enumerate(top, 1):
-            print(" ", _brief(lst, i))
+        print(f"\nDry run:")
+        print(_build_msg(top_under, top_over))
     else:
         from config import telegram_conf
         import requests, html as _html
         tok, chat = telegram_conf()
-        lines = [_brief(lst, i) for i, lst in enumerate(top, 1)]
-        msg = "\n".join(lines)
+        msg = _build_msg(top_under, top_over)
         r = requests.get(
             f"https://api.telegram.org/bot{tok}/sendMessage",
             params={"chat_id": chat, "text": msg, "parse_mode": "HTML",

@@ -51,10 +51,29 @@ Each function returns a list of dicts:
 import base64
 import json
 import re
+import subprocess
 import time
 
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
+
+def _hide_chromium():
+    """Hide the Chromium window on macOS (Cmd+H equivalent).
+
+    The browser keeps running and rendering — pages load, JS executes, LD+JSON
+    is extracted — but no window appears in the foreground or Mission Control.
+    Called once right after browser.launch().
+    """
+    try:
+        subprocess.run(
+            ["osascript", "-e",
+             'tell application "System Events" to set visible of every process'
+             ' whose name is "Chromium" to false'],
+            capture_output=True, timeout=3,
+        )
+    except Exception:
+        pass
+
 
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -108,6 +127,7 @@ def _make_page(p):
         headless=False,  # Akamai blocks headless — headed is required
         args=["--disable-blink-features=AutomationControlled"],
     )
+    _hide_chromium()
     ctx = browser.new_context(
         user_agent=_UA,
         viewport={"width": 1280, "height": 800},
@@ -116,6 +136,51 @@ def _make_page(p):
     page = ctx.new_page()
     _STEALTH.apply_stealth_sync(page)
     return browser, ctx, page
+
+
+def _dismiss_cookie_dialogs(page):
+    """Click through any cookie consent dialog if present. Returns True if one was dismissed.
+
+    Call AFTER the initial page-load sleep so the dialog has time to render.
+    Uses page.click() with a short timeout per candidate — fast no-op when absent.
+    """
+    candidates = [
+        'button:has-text("Accept All")',
+        'button:has-text("Accept all")',
+        'button:has-text("I Accept")',
+        'button:has-text("Accept")',
+        'button:has-text("Agree")',
+        'button:has-text("Allow All")',
+        'button:has-text("Allow all cookies")',
+        'button:has-text("Continue")',
+        '#onetrust-accept-btn-handler',
+        '[data-qa="accept-cookies"]',
+        '.cookie-consent-accept',
+    ]
+    for sel in candidates:
+        try:
+            page.click(sel, timeout=600)
+            time.sleep(0.3)
+            print(f"    (dismissed cookie dialog: {sel!r})")
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _read_result_count(page):
+    """Return the total result count shown on the page, or None if not found.
+
+    Matches patterns like '88 Cars', '163 Results', '3,247 vehicles'.
+    """
+    try:
+        text = page.inner_text("body")
+        m = re.search(r'([\d,]+)\s+(results?|vehicles?|cars?|listings?)', text[:4000], re.I)
+        if m:
+            return int(m.group(1).replace(",", ""))
+    except Exception:
+        pass
+    return None
 
 
 def _inject_cookies(ctx, domain):
@@ -249,18 +314,24 @@ def scrape_carmax(zip_code="90012", radius=75, year_min=2022,
         except Exception:
             pass
         time.sleep(wait_secs)
+        _dismiss_cookie_dialogs(page)   # called after sleep so dialog has rendered
+
+        total = _read_result_count(page)
 
         # Scroll until no new car cards appear (lazy-loaded SPA)
         n_links = _scroll_until_stable(
             page,
             '() => document.querySelectorAll(\'a[href*="/car/"]\').length',
         )
-        print(f"[carmax] {n_links} car links in DOM after scrolling")
+        if total and n_links < total:
+            print(f"[carmax] WARNING: {n_links} car links loaded / {total} total — some missed")
+        else:
+            print(f"[carmax] {n_links} car links loaded" + (f" / {total} total" if total else ""))
 
         ld_blocks = _extract_ld_json(page)
         stock_urls = _get_carmax_stock_urls(page)
         car_blocks = [b for b in ld_blocks if isinstance(b, dict) and b.get("@type") == "Car"]
-        print(f"[carmax] {len(ld_blocks)} LD+JSON blocks, {len(car_blocks)} @type=Car")
+        print(f"[carmax] {len(car_blocks)} @type=Car LD+JSON blocks")
 
         for block in ld_blocks:
             if not isinstance(block, dict) or block.get("@type") != "Car":
@@ -303,110 +374,118 @@ def scrape_carmax(zip_code="90012", radius=75, year_min=2022,
     return results
 
 
-def _carvana_url(year_min=2022, price_min=20000, price_max=40000,
-                 miles_max=50000):
-    """
-    Build a Carvana search URL with their base64-encoded filter blob (cvnaid).
+def _carvana_model_slug(cars_com_slug):
+    """Convert a Cars.com model slug to a Carvana path segment.
 
-    Carvana encodes fuel type and body filters as base64(JSON) in the cvnaid
-    query param, not as plain key=value pairs. Decoded example:
-        {"filters":{"fuelTypes":["Hybrid"]}}
+    Cars.com uses underscores (toyota-rav4_hybrid); Carvana uses hyphens (toyota-rav4-hybrid).
     """
-    payload = {
-        "filters": {
-            "fuelTypes": ["Hybrid", "Plug-In Hybrid"],
-            "bodyTypes": ["SUV / Crossover"],
-        }
-    }
-    cvnaid = base64.b64encode(
-        json.dumps(payload, separators=(",", ":")).encode()
-    ).decode()
-    return (
-        f"https://www.carvana.com/cars/filters"
-        f"?year={year_min}-2026"
-        f"&price={price_min}-{price_max}"
-        f"&mileage=0-{miles_max}"
-        f"&cvnaid={cvnaid}"
-    )
+    return cars_com_slug.replace("_", "-")
 
 
 def scrape_carvana(zip_code="90012", year_min=2022,
                    price_min=20000, price_max=40000, miles_max=50000,
-                   only_hybrid=True, wait_secs=8):
-    """
-    Search Carvana for hybrid/PHEV/EV SUV crossovers. Returns structured listings.
+                   only_hybrid=True, wait_secs=6):
+    """Search Carvana per-model (one URL per model in MODELS), reusing one browser session.
 
-    Carvana LD+JSON includes: VIN, price, year, make, model, mileage, exterior
-    color, and listing URL (in offers.url). It does NOT expose interior color,
-    interior type, or fuel type separately — `only_hybrid=True` post-filters
-    by title keyword for extra safety after the URL filter.
+    The old single broad search returned thousands of results and _scroll_until_stable
+    only loaded the first page-worth. Per-model URLs keep each result set small
+    (typically 0–50 per model) and guarantee we see everything.
+
+    Carvana LD+JSON includes: VIN, price, year, make, model, mileage, exterior color,
+    listing URL. No interior color or fuel type in the schema — only_hybrid=True
+    post-filters by title keyword.
     """
-    url = _carvana_url(year_min, price_min, price_max, miles_max)
+    from car_search import MODELS
 
     results = []
+    seen_vins: set = set()
+
     with sync_playwright() as p:
         browser, ctx, page = _make_page(p)
         if not _CDP_URL:
-            # Inject the cf_clearance cookie from real Chrome if available —
-            # this is the Cloudflare proof-of-humanity token
             _inject_cookies(ctx, "carvana.com")
 
-        try:
-            page.goto(url, timeout=30_000)
-        except Exception:
-            pass
-        time.sleep(wait_secs)
-
-        # Scroll until no new listing cards appear
-        n_blocks = _scroll_until_stable(
-            page,
-            '() => document.querySelectorAll(\'script[type="application/ld+json"]\').length',
-        )
-        ld_blocks = _extract_ld_json(page)
-        car_blocks = [b for b in ld_blocks if isinstance(b, dict) and b.get("@type") in ("Car", "Vehicle")]
-        print(f"[carvana] {n_blocks} LD+JSON blocks in DOM, {len(car_blocks)} @type=Car/Vehicle")
-
-        for block in ld_blocks:
-            if not isinstance(block, dict) or block.get("@type") not in ("Car", "Vehicle"):
-                continue
+        first = True
+        for _make, model_slug in MODELS:
+            slug = _carvana_model_slug(model_slug)
+            url = (f"https://www.carvana.com/cars/{slug}"
+                   f"?year={year_min}-2026&price={price_min}-{price_max}&mileage=0-{miles_max}")
             try:
-                miles = block.get("mileageFromOdometer")
-                if isinstance(miles, dict):
-                    miles = miles.get("value")
+                page.goto(url, timeout=30_000)
+            except Exception:
+                pass
 
-                desc = block.get("description", "")
-                # "Used 2024 GMC Terrain SLT with 55513 miles" → "SLT"
-                trim_match = re.search(
-                    r"(?:Used|New)\s+\d{4}\s+\S+\s+\S+\s+(\S+)", desc
-                )
-                trim = trim_match.group(1) if trim_match else ""
+            time.sleep(wait_secs if first else 3)
+            first = False
+            _dismiss_cookie_dialogs(page)
 
-                listing_url = (block.get("offers") or {}).get("url", "")
-                if not listing_url:
-                    sku = block.get("sku")
-                    listing_url = f"https://www.carvana.com/vehicle/{sku}" if sku else ""
+            total = _read_result_count(page)
 
-                rec = {
-                    "title": block.get("name", ""),
-                    "make": block.get("manufacturer") or block.get("brand", ""),
-                    "model": block.get("model", ""),
-                    "trim": trim,
-                    "year": block.get("modelDate"),
-                    "price": (block.get("offers") or {}).get("price"),
-                    "miles": miles,
-                    "color": block.get("color", ""),
-                    "interior": block.get("vehicleInteriorColor", ""),
-                    "interior_type": "",
-                    "fuel": "",
-                    "vin": block.get("vehicleIdentificationNumber", ""),
-                    "url": listing_url,
-                    "source": "carvana",
-                }
-                if only_hybrid and not _is_hybrid(rec):
+            # If total is suspiciously large (>2000), Carvana didn't recognise the
+            # model slug and is showing the full catalog — skip to avoid random cars.
+            if total and total > 2000:
+                print(f"[carvana/{slug}] SKIP — {total} total suggests unrecognised slug (full catalog)")
+                continue
+
+            n_blocks = _scroll_until_stable(
+                page,
+                '() => document.querySelectorAll(\'script[type="application/ld+json"]\').length',
+                max_scrolls=15, pause=2.0,
+            )
+            ld_blocks = _extract_ld_json(page)
+            car_blocks = [b for b in ld_blocks if isinstance(b, dict) and b.get("@type") in ("Car", "Vehicle")]
+
+            if total and len(car_blocks) < total:
+                print(f"[carvana/{slug}] WARNING: {len(car_blocks)} loaded / {total} total — scrolled more but capped")
+            else:
+                print(f"[carvana/{slug}] {len(car_blocks)} listings" + (f" / {total} total" if total else ""))
+
+            # Parse and accumulate results for this model
+            for block in ld_blocks:
+                if not isinstance(block, dict) or block.get("@type") not in ("Car", "Vehicle"):
                     continue
-                results.append(rec)
-            except Exception as e:
-                print(f"[carvana] parse error: {e}")
+                try:
+                    vin = block.get("vehicleIdentificationNumber", "")
+                    if vin in seen_vins:
+                        continue
+                    seen_vins.add(vin)
+
+                    miles = block.get("mileageFromOdometer")
+                    if isinstance(miles, dict):
+                        miles = miles.get("value")
+
+                    desc = block.get("description", "")
+                    trim_match = re.search(
+                        r"(?:Used|New)\s+\d{4}\s+\S+\s+\S+\s+(\S+)", desc
+                    )
+                    trim = trim_match.group(1) if trim_match else ""
+
+                    listing_url = (block.get("offers") or {}).get("url", "")
+                    if not listing_url:
+                        sku = block.get("sku")
+                        listing_url = f"https://www.carvana.com/vehicle/{sku}" if sku else ""
+
+                    rec = {
+                        "title": block.get("name", ""),
+                        "make": block.get("manufacturer") or block.get("brand", ""),
+                        "model": block.get("model", ""),
+                        "trim": trim,
+                        "year": block.get("modelDate"),
+                        "price": (block.get("offers") or {}).get("price"),
+                        "miles": miles,
+                        "color": block.get("color", ""),
+                        "interior": block.get("vehicleInteriorColor", ""),
+                        "interior_type": "",
+                        "fuel": "",
+                        "vin": vin,
+                        "url": listing_url,
+                        "source": "carvana",
+                    }
+                    if only_hybrid and not _is_hybrid(rec):
+                        continue
+                    results.append(rec)
+                except Exception as e:
+                    print(f"[carvana] parse error: {e}")
 
         browser.close()
     return results
