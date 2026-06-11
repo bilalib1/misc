@@ -31,6 +31,7 @@ from car_search import (
     YEAR_MIN, PRICE_MIN, PRICE_MAX, MILES_MAX,
     is_silver, has_acceptable_interior, has_leather, confirms_leather,
     is_blocked_model,
+    MANUFACTURER_MULTIPLIER, trim_score_multiplier,
     search_urls,
     UNVERIFIABLE_SELLERS, SOLD_MARKERS,
 )
@@ -375,15 +376,34 @@ async def _verify_vin(page, listing):
 # ---------------------------------------------------------------------------
 
 def _score(listing):
-    """Lower = better value. Year dominant; mileage secondary; price tiebreaker.
-    RAV4 Hybrid gets a priority boost — buyer's primary target.
-    Works per price bucket so price differences within a narrow range still matter."""
+    """Higher = better quality/value.
+
+    Base quality: year (dominant) + mileage (secondary) + price (tiebreaker).
+    Multiplied by manufacturer reliability tier × trim level.
+
+    Year pts  : 100 per year above 2019  → 2021=200, 2022=300 … 2026=700
+    Mile pts  : up to 100 pts; fewer miles = more pts
+    Price pts : up to 10 pts; lower price within the bucket = more pts
+
+    Manufacturer multiplier: Toyota/Lexus 1.10×  …  Jeep 0.90×  (see MANUFACTURER_MULTIPLIER)
+    Trim multiplier        : base leather 0.95×  …  top trim 1.10×  (see TRIM_RANKS)
+    """
     year  = _parse_year(listing.get("title", "")) or YEAR_MIN
     miles = listing.get("miles") or MILES_MAX
     price = listing.get("price") or PRICE_MAX
-    model, _ = _parse_model_trim(listing.get("title", ""))
-    priority = -3000 if model == "rav4 hybrid" else 0
-    return -(year - 2020) * 2000 + miles * 0.3 + price * 0.05 + priority
+    model, trim = _parse_model_trim(listing.get("title", ""))
+    make  = _make(listing)
+
+    year_pts  = (year - 2019) * 100
+    mile_pts  = (MILES_MAX - miles) / 500
+    price_pts = (PRICE_MAX - price) / 2000
+
+    base = year_pts + mile_pts + price_pts
+
+    mfr_mult  = MANUFACTURER_MULTIPLIER.get(make, 1.0)
+    trim_mult = trim_score_multiplier(model, trim) if model else 1.0
+
+    return base * mfr_mult * trim_mult
 
 
 def _make(listing):
@@ -399,9 +419,9 @@ def _select_diverse(listings, top_n=TOP_N, min_makes=MIN_MAKES, max_per_make=2):
     min_makes distinct makes, swap out the worst-value car to pull in the
     best-scoring car from each missing make.
     """
-    ranked = sorted(listings, key=_score)
+    # Higher score = better; sort descending so index 0 is the best car
+    ranked = sorted(listings, key=_score, reverse=True)
 
-    # Greedy pass: pick best-value while respecting per-make cap
     make_counts: dict = {}
     top = []
     remainder = []
@@ -420,13 +440,13 @@ def _select_diverse(listings, top_n=TOP_N, min_makes=MIN_MAKES, max_per_make=2):
             break
         m = _make(lst)
         if m not in makes_in_top:
-            top.sort(key=_score)
-            top.pop()   # drop the worst-value car
+            top.sort(key=_score, reverse=True)
+            top.pop()   # drop the last = lowest-scoring car
             top.append(lst)
             make_counts[m] = make_counts.get(m, 0) + 1
             makes_in_top.add(m)
 
-    top.sort(key=_score)
+    top.sort(key=_score, reverse=True)
     return top
 
 

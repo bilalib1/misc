@@ -212,6 +212,157 @@ def search_urls():
             yield build_search_url(make, model_slug, color)
 
 
+# ---------------------------------------------------------------------------
+# Reliability / quality scoring tables
+# ---------------------------------------------------------------------------
+
+# Manufacturer reliability multiplier.
+# Based on Consumer Reports predicted reliability + J.D. Power long-term data
+# for the specific hybrid platforms we search (2022-2026 model years).
+MANUFACTURER_MULTIPLIER = {
+    "toyota":      1.10,  # best hybrid reliability + resale; top CR scores
+    "lexus":       1.10,  # same platform as Toyota; highest JD Power rankings
+    "honda":       1.07,  # CR-V Hybrid consistently excellent; near-Toyota tier
+    "mazda":       1.05,  # CX-50 Hybrid strong debut; top predicted reliability
+    "subaru":      1.03,  # solid overall; AWD specialist; Crosstrek few issues
+    "hyundai":     1.00,  # baseline; improving fast but not Toyota-tier yet
+    "ford":        0.97,  # Escape Hybrid has had powertrain recalls; below avg
+    "nissan":      0.97,  # declining reliability trend across lineup
+    "mitsubishi":  0.94,  # thin dealer network; PHEV drivetrain OK but service costs
+    "volvo":       0.93,  # higher ownership / repair costs; below-avg reliability
+    "jeep":        0.90,  # 4xe consistently lowest JD Power scores in its segment
+}
+
+# Trim hierarchy per model: rank 1 = base leather trim, higher = better equipped.
+# Normalized to a 0.95×–1.10× multiplier (15 pp spread) in trim_score_multiplier().
+# Only trims already in LEATHER_TRIMS are listed — no cloth trims here.
+TRIM_RANKS = {
+    "rav4 hybrid": {
+        "xle premium": 1,   # SofTex, base leather; same MSRP tier as XSE
+        "xse":         2,   # SofTex + sport styling; slight premium over XLE Prem
+        "limited":     3,   # SofTex + panoramic roof + head-up display; top trim
+    },
+    "venza": {
+        "le":      1,   # SofTex standard on all Venza; LE is base
+        "xle":     2,   # adds tech/JBL
+        "limited": 3,   # panoramic glass roof + premium audio
+    },
+    "cr-v hybrid": {
+        "ex-l":          1,   # leather + heated seats
+        "sport-l":       2,   # adds 12\" infotainment + more driver assists
+        "sport touring": 3,   # top; HUD + Bose + wireless charging
+    },
+    "tucson hybrid": {
+        "limited": 1,   # only leather trim offered
+    },
+    "tucson plug-in hybrid": {
+        "limited": 1,
+    },
+    "santa fe hybrid": {
+        "limited":    1,
+        "calligraphy": 2,   # adds Nappa leather + quilted seats
+    },
+    "cx-50 hybrid": {
+        "premium":      1,
+        "premium plus": 2,   # adds Bose + larger sunroof + ventilated seats
+    },
+    "escape hybrid": {
+        "titanium": 1,   # only leather trim; ActiveX synthetic
+    },
+    "escape plug-in hybrid": {
+        "titanium": 1,
+    },
+    "nx 350h": {
+        "base":              1,   # NuLuxe standard across all NX 350h
+        "premium":           2,   # adds 14\" screen + panoramic roof
+        "luxury":            3,   # adds semi-aniline leather + real wood trim
+        "f sport":           3,   # sport-tuned suspension; same tech tier as Luxury
+        "f sport handling":  4,   # adaptive suspension + torque vectoring; top
+    },
+    "ux 250h": {
+        "base":    1,   # NuLuxe; compact entry luxury
+        "premium": 2,   # adds moonroof + 10.3\" screen
+        "luxury":  3,   # adds heated/ventilated + real wood
+        "f sport": 3,   # sport-tuned; same tier as Luxury
+    },
+    "xc40": {
+        "plus":        1,   # leather-like Tailored Wool / Microtech
+        "inscription": 2,   # pre-2024 name for Ultimate; full leather
+        "r-design":    2,   # sport variant of Inscription tier
+        "ultimate":    3,   # Nappa leather + panoramic roof + B&W audio
+    },
+    "xc60 recharge": {
+        "plus":        1,
+        "inscription": 2,
+        "r-design":    2,
+        "ultimate":    3,
+    },
+    "outlander phev": {
+        "sel": 1,   # leather + 10.8\" HUD + 12-speaker Bose
+        "gt":  2,   # adds ventilated seats + power running boards
+    },
+    "crosstrek hybrid": {
+        "hybrid":  1,   # base Crosstrek Hybrid
+        "limited": 2,   # leather + navigation
+    },
+    "wrangler 4xe": {
+        "sahara":       1,   # leather-wrapped interior; comfort-focused
+        "rubicon x":    2,   # off-road focused + leather option
+        "high altitude": 3,  # luxury off-road; full leather + sky one-touch roof
+    },
+    "grand cherokee 4xe": {
+        "limited":   1,
+        "trailhawk": 2,   # off-road + leather
+        "overland":  3,   # luxury leather + real wood
+        "summit":    4,   # McEvoy leather + 19-speaker McIntosh; top trim
+    },
+    "murano hybrid": {
+        "sl":       1,
+        "platinum": 2,   # semi-aniline leather + premium audio
+    },
+    "rogue": {
+        "sl":       1,
+        "platinum": 2,
+    },
+    "corolla cross hybrid": {
+        "xle": 1,
+    },
+    "mustang mach-e": {
+        "premium":           1,
+        "california route 1": 2,
+        "first edition":     2,
+        "gt":                3,   # performance + MagneRide
+    },
+}
+
+
+def trim_score_multiplier(model: str, trim: str) -> float:
+    """Return a trim-level quality multiplier in [0.95, 1.10].
+
+    Unknown / unrecognised trims return 1.0 (neutral).
+    Matching uses substring search so partial trim strings work.
+    When multiple trim keys match (e.g. 'premium' inside 'premium plus'),
+    the highest rank wins.
+    """
+    ranks = TRIM_RANKS.get((model or "").lower())
+    if not ranks:
+        return 1.0
+    t = (trim or "").lower()
+    best = None
+    for key, rank in ranks.items():
+        if key in t:
+            if best is None or rank > best:
+                best = rank
+    if best is None:
+        return 1.0
+    max_rank = max(ranks.values())
+    if max_rank <= 1:
+        return 1.05   # only one tier → slight boost over unknown
+    normalized = (best - 1) / (max_rank - 1)   # 0.0 → 1.0
+    return 0.95 + normalized * 0.15             # 0.95 → 1.10
+
+
+# ---------------------------------------------------------------------------
 # Models excluded regardless of other filters — sedans/non-SUVs that slipped
 # into LEATHER_TRIMS for reference but don't fit the buyer's "SUV/crossover" requirement.
 BLOCKED_MODELS = {
