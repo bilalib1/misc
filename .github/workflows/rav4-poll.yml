@@ -10,9 +10,13 @@ permissions:
 jobs:
   poll:
     runs-on: ubuntu-latest
-    # secrets.* can't be used in step-level `if`; surface it as a job env var.
+    # secrets.* can't be used in step-level `if`; surface as job env vars.
+    # Use EITHER a metered API key OR a Claude subscription OAuth token
+    # (`claude setup-token`). If both are set, ANTHROPIC_API_KEY wins, so set
+    # only one. The bot steps run if either is present.
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     defaults:
       run:
         working-directory: rav4-tracker
@@ -32,17 +36,18 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      # Conversational control plane — only runs if you've set ANTHROPIC_API_KEY.
+      # Conversational control plane — runs if you've set ANTHROPIC_API_KEY
+      # or a subscription CLAUDE_CODE_OAUTH_TOKEN.
       - name: install Claude Code
-        if: ${{ always() && env.ANTHROPIC_API_KEY != '' }}
+        if: ${{ always() && (env.ANTHROPIC_API_KEY != '' || env.CLAUDE_CODE_OAUTH_TOKEN != '') }}
         run: npm install -g @anthropic-ai/claude-code
       - name: git identity
-        if: ${{ always() && env.ANTHROPIC_API_KEY != '' }}
+        if: ${{ always() && (env.ANTHROPIC_API_KEY != '' || env.CLAUDE_CODE_OAUTH_TOKEN != '') }}
         run: |
           git config user.name "rav4-bot"
           git config user.email "rav4-bot@users.noreply.github.com"
       - name: bot
-        if: ${{ always() && env.ANTHROPIC_API_KEY != '' }}
+        if: ${{ always() && (env.ANTHROPIC_API_KEY != '' || env.CLAUDE_CODE_OAUTH_TOKEN != '') }}
         run: python bot.py
         env:
           CI: "true"

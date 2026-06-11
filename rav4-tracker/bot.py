@@ -69,8 +69,10 @@ def head():
 def main():
     tok, owner = telegram_conf()
 
-    if not shutil.which("claude") or (os.environ.get("CI") and not os.environ.get("ANTHROPIC_API_KEY")):
-        print("Claude Code unavailable (no binary or no ANTHROPIC_API_KEY in CI); bot disabled.")
+    have_creds = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
+    if not shutil.which("claude") or (os.environ.get("CI") and not have_creds):
+        print("Claude Code unavailable (no binary, or no ANTHROPIC_API_KEY / "
+              "CLAUDE_CODE_OAUTH_TOKEN in CI); bot disabled.")
         return
 
     updates = get_updates(tok)
