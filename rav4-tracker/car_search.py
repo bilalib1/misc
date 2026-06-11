@@ -32,7 +32,8 @@ MILES_MAX = 50000
 YEAR_MIN = 2022
 
 # RAV4 Hybrid and its closest hybrid-crossover relatives. (make, model slug)
-# Kia is excluded per buyer preference.
+# Kia is excluded per buyer preference. Spread across makes so a ranked top-N
+# can hit >=7 brands with no brand repeated 3x.
 MODELS = [
     ("toyota", "toyota-rav4_hybrid"),
     ("toyota", "toyota-venza"),
@@ -40,7 +41,21 @@ MODELS = [
     ("hyundai", "hyundai-tucson_hybrid"),
     ("hyundai", "hyundai-santa_fe_hybrid"),
     ("mazda", "mazda-cx_50_hybrid"),
+    ("ford", "ford-escape_hybrid"),
+    ("ford", "ford-escape_plug_in_hybrid"),
+    ("lexus", "lexus-nx_350h"),
+    ("lexus", "lexus-ux_250h"),
+    ("volvo", "volvo-xc40"),
+    ("volvo", "volvo-xc60_recharge"),
+    ("mitsubishi", "mitsubishi-outlander_phev"),
+    ("subaru", "subaru-crosstrek_hybrid"),
+    ("jeep", "jeep-wrangler_4xe"),
+    ("jeep", "jeep-grand_cherokee_4xe"),
 ]
+# Note: Ford Escape / Volvo XC60 Recharge PHEVs aren't reachable by a dedicated
+# model slug on Cars.com — they live under the base model slug (ford-escape,
+# volvo-xc60) behind a `fuel_slugs[]=hybrid|plug_in_hybrid` filter this builder
+# doesn't add, so those URLs come back empty. Query them by hand if needed.
 
 # Query both color buckets; many "silver" cars are filed under gray. The buyer
 # treats silver synonyms (platinum graphite, steel gray, chrome, stardust, etc.)
@@ -66,6 +81,16 @@ LEATHER_TRIMS = {
     "tucson hybrid": {"limited", "n line"},
     "santa fe hybrid": {"limited", "calligraphy"},
     "cx-50 hybrid": {"premium", "premium plus"},          # both CX-50 Hybrid trims are leather
+    "escape hybrid": {"titanium"},                         # ActiveX on lower trims is cloth-ish; Titanium = leather
+    "escape plug-in hybrid": {"titanium"},
+    "nx 350h": {"base", "premium", "luxury", "f sport", "f sport handling"},  # NuLuxe standard across NX 350h
+    "ux 250h": {"base", "premium", "luxury", "f sport"},  # NuLuxe standard across UX 250h
+    "xc40": {"inscription", "r-design", "ultimate", "plus"},  # leather/leather-like; Momentum base is City Weave cloth
+    "xc60 recharge": {"plus", "ultimate", "inscription", "r-design"},  # Nappa/leather standard on Recharge trims
+    "outlander phev": {"sel", "gt"},                       # leather on SEL/GT; ES/SE are cloth
+    "crosstrek hybrid": {"hybrid", "limited"},             # leather-trimmed; base/Sport are cloth
+    "wrangler 4xe": {"high altitude", "rubicon x", "sahara"},  # leather standard/optional; CONFIRM per listing — many are cloth
+    "grand cherokee 4xe": {"limited", "overland", "summit", "trailhawk"},  # base 4xe is cloth
 }
 
 

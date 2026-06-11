@@ -236,6 +236,8 @@ First run (2026-06-10): texted a verified top 10 — RAV4 Hybrid XLE Premium / X
 
 Re-run (2026-06-10): buyer asked to exclude Kia entirely; resent a Kia-free top 10 spanning Toyota (Venza XLE, RAV4 XSE / XLE Premium), Hyundai (Tucson N Line / Limited), Honda (CR-V Sport-L ×2 / Sport Touring), and Mazda (CX-50 Hybrid Premium / Premium Plus), $25,999–$39,981. Dropped Kia from `MODELS` + `LEATHER_TRIMS`; added Mazda CX-50 Hybrid (Premium + Premium Plus are leather). Several listings from the first run had already sold, so finalists were re-verified live before sending.
 
+Brand-diversity run (2026-06-10): buyer required **≥7 different brands, no brand repeated 3× (max 2 per make)**. Widened `MODELS` to add Ford Escape (Hybrid/PHEV), Lexus NX 350h / UX 250h, Volvo XC40 / XC60 Recharge, Mitsubishi Outlander PHEV, Subaru Crosstrek Hybrid, with matching `LEATHER_TRIMS` entries. Live SoCal inventory only materialized for 7 makes: Toyota, Honda, Hyundai, Mazda, **Lexus** (UX 250h, NuLuxe), **Mitsubishi** (Outlander PHEV SEL/GT leather), and **Jeep** (Wrangler 4xe High Altitude, leather — the 7th brand). Ford Escape Titanium, Volvo (XC40 is mild-hybrid only; XC60 Recharge none nearby), Subaru Crosstrek Hybrid, Hyundai Santa Fe Hybrid, Lexus NX, Audi Q5 PHEV, BMW X3 30e, Lincoln Corsair GT, Dodge Hornet R/T, Chrysler Pacifica, and Jeep Grand Cherokee 4xe all returned zero qualifying live greater-LA listings (mostly out-of-region or wrong color). **Watch-out:** CarMax / dealer-network results mislabel the listing city — always confirm the real dealer address on the detail page (caught San-Diego and out-of-state cars masquerading as Burbank). Final 10: 7 makes, max 2 each, $25,975–$39,998.
+
 ---
 
 ## 16b. Follow-ups / Future Work
