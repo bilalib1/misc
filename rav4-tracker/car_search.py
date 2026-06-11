@@ -70,11 +70,25 @@ MODELS = [
 # as passing, so we cast the wide net here and let SILVER_SYNONYMS confirm.
 COLOR_SLUGS = ["silver", "gray"]
 
-# Substrings (lowercased) that count as "silver" for this buyer.
+# Buyer wants LIGHT exteriors ONLY: silver and light gray. Dark / blue-leaning
+# grays are OUT — the buyer flagged a "Graphite Gray" Outlander as looking blue.
+# A light allowlist PLUS a dark denylist that VETOES a match (denylist wins even
+# if the name also contains "silver"/"gray").
 SILVER_SYNONYMS = (
-    "silver", "gray", "grey", "graphite", "steel", "chrome", "stardust",
-    "platinum", "magnetic", "celestial", "silky", "lunar", "atomic",
-    "shimmering", "cement", "titanium",
+    "silver", "ice silver", "alloy silver", "shimmering silver", "billet silver",
+    "sterling", "glacier", "light gray", "light grey", "platinum", "white frost",
+)
+DARK_COLOR_MARKERS = (
+    "graphite", "magnetic", "gunmetal", "steel", "charcoal", "granite", "cement",
+    "titanium", "meteorite", "machine gray", "machine grey", "polymetal",
+    "urban gray", "urban grey", "mercury", "dark gray", "dark grey",
+)
+
+# Buyer also wants a LIGHT / warm INTERIOR (not a black cabin): tan, brown,
+# beige, off-white, eggshell, cream and the like.
+LIGHT_INTERIOR_SYNONYMS = (
+    "tan", "brown", "beige", "off-white", "off white", "eggshell", "cream",
+    "saddle", "macchiato", "camel", "almond", "sand", "ivory", "parchment",
 )
 
 # Trims whose STANDARD seat is leather or leather-like (SofTex/SynTex/H-Tex/
@@ -104,7 +118,14 @@ LEATHER_TRIMS = {
 
 def is_silver(color: str) -> bool:
     c = (color or "").lower()
+    if any(d in c for d in DARK_COLOR_MARKERS):  # dark/blue-leaning grays veto
+        return False
     return any(s in c for s in SILVER_SYNONYMS)
+
+
+def has_light_interior(interior: str) -> bool:
+    c = (interior or "").lower()
+    return any(s in c for s in LIGHT_INTERIOR_SYNONYMS)
 
 
 def has_leather(model: str, trim: str) -> bool:
