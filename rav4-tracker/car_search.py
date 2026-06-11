@@ -223,13 +223,12 @@ def send_ranked(listings, header=None, require_verified=True):
                 + "\nConfirm each VIN is in stock on the SELLING DEALER'S OWN site "
                   "(Cars.com lags and shows sold cars), then set vin + verified.")
     tok, chat = telegram_conf()
-    header = header or ("Top silver/grey hybrids near LA - leather, 2022+, "
-                        "under 50k mi, $20-40k. Best value first:")
+    header = header or "Silver/light-gray leather hybrids, 2022+, under 50k mi, $20-40k:"
     lines = [header, ""]
     for i, d in enumerate(listings, 1):
-        title = html.escape(d["title"])
-        lines.append(f'{i}. {title} - {d["price"]} | {d["miles"]} | '
-                     f'{d["city"]} - <a href="{d["url"]}">view</a>')
+        title = html.escape(d["title"])  # "<year> <make> <model> <trim>"
+        lines.append(f'{i}. {title} - {d["price"]} | {d["miles"]} - '
+                     f'<a href="{d["url"]}">view</a>')
     msg = "\n".join(lines)
     r = requests.get(
         f"https://api.telegram.org/bot{tok}/sendMessage",
