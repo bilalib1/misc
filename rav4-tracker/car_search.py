@@ -70,30 +70,28 @@ MODELS = [
 # as passing, so we cast the wide net here and let SILVER_SYNONYMS confirm.
 COLOR_SLUGS = ["silver", "gray"]
 
-# Exterior: silver, grey, and common silver synonyms are allowed broadly.
-# The denylist is the real gate — dark/blue-leaning colors are vetoed regardless
-# of what else is in the name. Anything that contains a silver/gray root word
-# and is NOT vetoed passes.
+# Exterior: light colors pass; dark/vivid colors are vetoed.
+# Root words that imply a light/neutral exterior (silver, gray, white, etc.).
+# White is included — buyer may want silver OR white since both are "light."
 SILVER_ROOTS = (
-    "silver", "gray", "grey", "chrome", "platinum", "titanium",
+    "silver", "gray", "grey", "white", "chrome", "platinum", "titanium",
     "stardust", "sterling", "glacier", "frost", "quartz", "lunar",
     "arctic", "alpine", "pearl",
 )
+# Strings that veto a color regardless of root-word matches — dark/blue-leaning.
 DARK_COLOR_MARKERS = (
     "graphite", "magnetic", "gunmetal", "charcoal", "granite", "cement",
     "meteorite", "machine gray", "machine grey", "polymetal",
     "urban gray", "urban grey", "mercury", "dark gray", "dark grey",
 )
+# Vivid/dark colors that should never pass even if they contain no dark marker.
+_BLOCKED_COLORS = {"black", "blue", "red", "green", "orange", "yellow",
+                   "purple", "brown", "maroon", "pink", "gold", "bronze",
+                   "copper", "violet", "indigo", "teal", "navy", "burgundy"}
 
-# Interior: buyer relaxed this from "warm/light only" to "anything but an
-# all-black cabin." Warm tones (tan/beige/cream) still pass, and so do neutral
-# grays and two/three-tone combos. Only a solid black interior is vetoed.
-ACCEPTABLE_INTERIOR_SYNONYMS = (
-    "tan", "brown", "beige", "off-white", "off white", "eggshell", "cream",
-    "saddle", "macchiato", "camel", "almond", "sand", "ivory", "parchment",
-    "gray", "grey", "graphite", "ash", "stone", "boulder", "greige", "ceramic",
-    "two-tone", "two tone", "three-tone", "three tone", "3-tone", "light",
-)
+# Interior: rule is simply "not solid black." Flip to a negative blocklist so
+# white, cream, gray, beige, and any unlisted color all pass automatically.
+_BLACK_INTERIORS = {"black", "jet black", "ebony", "noir", "onyx"}
 
 # Trims whose STANDARD seat is leather or leather-like (SofTex/SynTex/H-Tex/
 # NuLuxe). Verified against authoritative trim specs (manufacturer / Edmunds /
@@ -119,23 +117,35 @@ LEATHER_TRIMS = {
     "crosstrek hybrid": {"hybrid", "limited"},             # leather-trimmed; base/Sport are cloth
     "wrangler 4xe": {"high altitude", "rubicon x", "sahara"},  # leather standard/optional; CONFIRM per listing — many are cloth
     "grand cherokee 4xe": {"limited", "overland", "summit", "trailhawk"},  # base 4xe is cloth
+    # Tesla: all trims ship with vegan leather (same category as SofTex/NuLuxe)
+    "model y": {"long range", "performance", "rear-wheel drive", "standard range", "awd"},
+    "model 3": {"long range", "performance", "rear-wheel drive", "standard range plus",
+                "standard range", "awd", ""},  # "" catches blank trim from CarMax
+    # Corolla Cross Hybrid: XLE has SofTex; S/SE are fabric
+    "corolla cross hybrid": {"xle"},
+    # Mustang Mach-E: Premium, First Edition, GT; Select is cloth
+    "mustang mach-e": {"premium", "first edition", "gt", "california route 1"},
 }
 
 
 def is_silver(color: str) -> bool:
-    c = (color or "").lower()
-    if any(d in c for d in DARK_COLOR_MARKERS):  # dark/blue-leaning grays veto
+    """Pass light/neutral exteriors; veto dark, vivid, or unknown colors."""
+    c = (color or "").lower().strip()
+    if not c:
+        return False
+    if any(d in c for d in DARK_COLOR_MARKERS):
+        return False
+    if c in _BLOCKED_COLORS:
         return False
     return any(s in c for s in SILVER_ROOTS)
 
 
 def has_acceptable_interior(interior: str) -> bool:
-    c = (interior or "").lower()
+    """Pass anything that is not a solid-black interior. Empty = unknown = pass."""
+    c = (interior or "").lower().strip()
     if not c:
-        return False
-    if c.strip() in ("black", "jet black", "ebony"):  # solid black cabin vetoed
-        return False
-    return any(s in c for s in ACCEPTABLE_INTERIOR_SYNONYMS)
+        return True   # unknown interior — don't veto
+    return c not in _BLACK_INTERIORS
 
 
 def has_leather(model: str, trim: str) -> bool:

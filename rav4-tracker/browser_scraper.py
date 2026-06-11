@@ -404,37 +404,72 @@ def _leather_model_key(model, trim):
     return m, t
 
 
-def filter_listings(listings, car_search_module):
+def _model_has_any_leather(model_str, cs):
     """
-    Apply car_search.py filter rules (silver exterior, acceptable interior,
-    leather trim spec) to a list of browser-scraped listings.
+    Return True if LEATHER_TRIMS has ANY entry for this model family.
 
-    Pass the imported car_search module so rules stay in one place.
+    Used for Carvana, where the trim field is unreliable (parsed from a
+    short description, often just "Hybrid" or "Plug-in"). If the model is
+    known to offer leather in some trims, we pass it through and let the
+    user confirm the exact trim on the listing page.
+    """
+    m = model_str.lower().strip()
+    # Direct match
+    if m in cs.LEATHER_TRIMS:
+        return True
+    # Try stripping fuel suffix ("Tucson Plug-in Hybrid" → "Tucson" → "tucson hybrid")
+    base = _FUEL_SUFFIX_RE.sub("", m).strip()
+    if base in cs.LEATHER_TRIMS:
+        return True
+    if (base + " hybrid") in cs.LEATHER_TRIMS:
+        return True
+    if (base + " plug-in hybrid") in cs.LEATHER_TRIMS:
+        return True
+    return False
+
+
+def filter_listings(listings, car_search_module, close_misses=False):
+    """
+    Apply filter rules to browser-scraped listings.
+
+    CarMax LD+JSON includes the actual trim level, so we run the full
+    trim-level leather check. Carvana's trim is parsed from a short
+    description and is unreliable — we use a model-level check there
+    (does this model offer leather in ANY trim?) and let the user verify
+    the exact trim on the listing page.
+
+    close_misses=True also returns listings that pass color but fail
+    interior — useful to surface "almost" cars (e.g. black-interior RAV4).
     """
     cs = car_search_module
     out = []
+    misses = []
+
     for c in listings:
         if not cs.is_silver(c.get("color", "")):
-            continue
+            continue  # wrong color family entirely — skip
+
         interior = c.get("interior", "")
-        if interior and not cs.has_acceptable_interior(interior):
-            continue
+        interior_ok = cs.has_acceptable_interior(interior)
+
         model = c.get("model", "").lower()
         trim = c.get("trim", "").lower()
-        # Try leather check with full model string (CarMax format)
-        if cs.has_leather(model, trim):
+
+        if c.get("source") == "carvana":
+            # Carvana: trim field is unreliable — model-level leather check
+            leather = _model_has_any_leather(model, cs)
+        else:
+            # CarMax: trim is accurate — use full trim-level check
+            leather = cs.has_leather(model, trim)
+
+        if interior_ok and leather:
             out.append(c)
-            continue
-        # Carvana embeds fuel type in model ("Tucson Plug-in Hybrid" → "tucson hybrid")
-        # Strip the suffix and retry with canonical hybrid suffix
-        base = _FUEL_SUFFIX_RE.sub("", model).strip()
-        if base != model and cs.has_leather(base + " hybrid", trim):
-            out.append(c)
-            continue
-        # Last try: bare base model ("tucson plug-in hybrid" is already in LEATHER_TRIMS)
-        if base != model and cs.has_leather(model, trim):
-            out.append(c)
-    return out
+        elif close_misses and leather and not interior_ok:
+            c = dict(c)
+            c["_close_miss"] = f"black interior ({interior})"
+            misses.append(c)
+
+    return out, misses
 
 
 def to_shortlist_entry(c):
