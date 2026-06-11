@@ -144,11 +144,28 @@ def _extract_ld_json(page):
     )
 
 
-def _scroll_for_more(page, scrolls=3, pause=2.0):
-    """Scroll down to trigger lazy-loading of additional results."""
-    for _ in range(scrolls):
+def _scroll_until_stable(page, count_js, max_scrolls=25, pause=2.5, stability_rounds=2):
+    """Scroll until the count returned by count_js stops growing for stability_rounds rounds.
+
+    count_js is a JS expression like "() => document.querySelectorAll(...).length".
+    Stops early once fully loaded; hard-caps at max_scrolls to avoid loops.
+    Returns the final count.
+    """
+    prev = 0
+    stable = 0
+    for i in range(max_scrolls):
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         time.sleep(pause)
+        cur = page.evaluate(count_js)
+        if cur == prev:
+            stable += 1
+            if stable >= stability_rounds:
+                print(f"    (scroll stable at {cur} after {i+1} scrolls)")
+                break
+        else:
+            stable = 0
+        prev = cur
+    return prev
 
 
 def _get_carmax_stock_urls(page):
@@ -233,11 +250,17 @@ def scrape_carmax(zip_code="90012", radius=75, year_min=2022,
             pass
         time.sleep(wait_secs)
 
-        # Scroll to load more results (lazy-loaded)
-        _scroll_for_more(page, scrolls=3, pause=2.0)
+        # Scroll until no new car cards appear (lazy-loaded SPA)
+        n_links = _scroll_until_stable(
+            page,
+            '() => document.querySelectorAll(\'a[href*="/car/"]\').length',
+        )
+        print(f"[carmax] {n_links} car links in DOM after scrolling")
 
         ld_blocks = _extract_ld_json(page)
         stock_urls = _get_carmax_stock_urls(page)
+        car_blocks = [b for b in ld_blocks if isinstance(b, dict) and b.get("@type") == "Car"]
+        print(f"[carmax] {len(ld_blocks)} LD+JSON blocks, {len(car_blocks)} @type=Car")
 
         for block in ld_blocks:
             if not isinstance(block, dict) or block.get("@type") != "Car":
@@ -333,9 +356,15 @@ def scrape_carvana(zip_code="90012", year_min=2022,
         except Exception:
             pass
         time.sleep(wait_secs)
-        _scroll_for_more(page, scrolls=3, pause=2.0)
 
+        # Scroll until no new listing cards appear
+        n_blocks = _scroll_until_stable(
+            page,
+            '() => document.querySelectorAll(\'script[type="application/ld+json"]\').length',
+        )
         ld_blocks = _extract_ld_json(page)
+        car_blocks = [b for b in ld_blocks if isinstance(b, dict) and b.get("@type") in ("Car", "Vehicle")]
+        print(f"[carvana] {n_blocks} LD+JSON blocks in DOM, {len(car_blocks)} @type=Car/Vehicle")
 
         for block in ld_blocks:
             if not isinstance(block, dict) or block.get("@type") not in ("Car", "Vehicle"):

@@ -80,6 +80,7 @@ def _parse_model_trim(title):
         "escape plug-in hybrid", "escape hybrid",
         "cr-v hybrid", "rav4 hybrid",
         "cx-50 hybrid", "nx 350h", "ux 250h",
+        "murano hybrid", "rogue",
         "venza", "xc40",
     ]
     for key in model_keys:
@@ -180,25 +181,35 @@ async def _fetch_detail(page, listing):
             listing["gone"] = True
             return
 
-        # VIN: try LD+JSON first (Cars.com embeds it on detail pages)
-        ld_vins = await page.evaluate("""() => {
+        # VIN + colors: try LD+JSON first (Cars.com embeds full schema on detail pages)
+        ld_data = await page.evaluate("""() => {
             return Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
                 .map(s => { try { return JSON.parse(s.textContent); } catch { return null; } })
-                .filter(x => x && x.vehicleIdentificationNumber)
-                .map(x => x.vehicleIdentificationNumber);
+                .filter(x => x && (x.vehicleIdentificationNumber || x.color || x.vehicleInteriorColor));
         }""")
-        if ld_vins:
-            listing["vin"] = ld_vins[0]
-        else:
+        for block in (ld_data or []):
+            if block.get("vehicleIdentificationNumber") and not listing["vin"]:
+                listing["vin"] = block["vehicleIdentificationNumber"]
+            if block.get("color") and not listing["ext_color"]:
+                listing["ext_color"] = block["color"].lower()
+            if block.get("vehicleInteriorColor") and not listing["interior"]:
+                listing["interior"] = block["vehicleInteriorColor"].lower()
+
+        if not listing["vin"]:
             m = re.search(r"\b([A-HJ-NPR-Z0-9]{17})\b", body)
             if m:
                 listing["vin"] = m.group(1)
 
-        # Color: from the specs/overview section
+        # Color: from the specs/overview section (multiple selector attempts)
         spec_text = await page.evaluate("""() => {
-            const sels = ['[class*="basics"] li', '[class*="specs"] li',
-                          '[class*="overview"] li', '.vehicle-details li',
-                          '[data-qa="specs-list"] li'];
+            const sels = [
+                '[class*="basics"] li', '[class*="specs"] li',
+                '[class*="overview"] li', '.vehicle-details li',
+                '[data-qa="specs-list"] li',
+                '[data-testid*="spec"] li', '[data-testid*="feature"] li',
+                '.vehicle-specs li', '.basic-section li',
+                '[class*="VehicleOverview"] li', '[class*="vehicle-overview"] li',
+            ];
             for (const sel of sels) {
                 const items = document.querySelectorAll(sel);
                 if (items.length) return Array.from(items).map(i => i.innerText).join('|');
@@ -211,6 +222,16 @@ async def _fetch_detail(page, listing):
                 listing["ext_color"] = pl.split(":")[-1].strip()
             if "interior" in pl and not listing["interior"]:
                 listing["interior"] = pl.split(":")[-1].strip()
+
+        # HTML regex fallback for color if still missing after LD+JSON + CSS
+        if not listing["ext_color"]:
+            m = re.search(r'exterior[^<"]{0,30}color[^:"]{0,10}[:"]\s*"?([A-Za-z/ ]+?)(?:"|<|,|\n)', body, re.I)
+            if m:
+                listing["ext_color"] = m.group(1).strip().lower()
+        if not listing["interior"]:
+            m = re.search(r'interior[^<"]{0,30}color[^:"]{0,10}[:"]\s*"?([A-Za-z/ ]+?)(?:"|<|,|\n)', body, re.I)
+            if m:
+                listing["interior"] = m.group(1).strip().lower()
 
         # Mark as verified — page loaded and car isn't sold
         listing["verified"] = True
@@ -296,11 +317,13 @@ async def _verify_vin(page, listing):
 # ---------------------------------------------------------------------------
 
 def _score(listing):
-    """Lower = better value. Price-dominant; slight reward for newer/lower-miles."""
-    price = listing.get("price") or 99_999
+    """Lower = better quality. Year-dominant (newer = better), then mileage.
+    RAV4 Hybrid gets a priority boost — buyer's target model."""
     year = _parse_year(listing.get("title", "")) or YEAR_MIN
     miles = listing.get("miles") or MILES_MAX
-    return price - (year - YEAR_MIN) * 300 + miles * 0.05
+    model, _ = _parse_model_trim(listing.get("title", ""))
+    priority = -3000 if model == "rav4 hybrid" else 0
+    return -(year - 2020) * 2000 + miles * 0.3 + priority
 
 
 def _make(listing):
@@ -309,29 +332,39 @@ def _make(listing):
     return parts[1].lower() if len(parts) > 1 else "unknown"
 
 
-def _select_diverse(listings, top_n=TOP_N, min_makes=MIN_MAKES):
-    """Return up to top_n listings, sorted by score, with no per-make cap.
+def _select_diverse(listings, top_n=TOP_N, min_makes=MIN_MAKES, max_per_make=2):
+    """Return up to top_n listings, best value first, max max_per_make per brand.
 
-    If the greedy top-N doesn't cover min_makes distinct makes, swap in the
-    best-scoring car from each missing make until the requirement is met or
-    inventory runs out.
+    Greedy pass respects the per-make cap. If the result still doesn't cover
+    min_makes distinct makes, swap out the worst-value car to pull in the
+    best-scoring car from each missing make.
     """
     ranked = sorted(listings, key=_score)
-    top = ranked[:top_n]
-    makes_in_top = {_make(lst) for lst in top}
 
-    if len(makes_in_top) < min_makes:
-        # Find makes present in the broader verified pool but not yet in top
-        remaining = [lst for lst in ranked[top_n:]]
-        for lst in remaining:
-            if len(makes_in_top) >= min_makes:
-                break
-            m = _make(lst)
-            if m not in makes_in_top:
-                # Swap out the worst (highest score) car in top to make room
-                top.sort(key=_score)
-                top[-1] = lst
-                makes_in_top.add(m)
+    # Greedy pass: pick best-value while respecting per-make cap
+    make_counts: dict = {}
+    top = []
+    remainder = []
+    for lst in ranked:
+        m = _make(lst)
+        if make_counts.get(m, 0) < max_per_make and len(top) < top_n:
+            top.append(lst)
+            make_counts[m] = make_counts.get(m, 0) + 1
+        else:
+            remainder.append(lst)
+
+    # Diversity boost: if we still fall short of min_makes, swap in best from missing makes
+    makes_in_top = {_make(lst) for lst in top}
+    for lst in remainder:
+        if len(makes_in_top) >= min_makes:
+            break
+        m = _make(lst)
+        if m not in makes_in_top:
+            top.sort(key=_score)
+            top.pop()   # drop the worst-value car
+            top.append(lst)
+            make_counts[m] = make_counts.get(m, 0) + 1
+            makes_in_top.add(m)
 
     top.sort(key=_score)
     return top

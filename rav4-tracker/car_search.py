@@ -60,6 +60,8 @@ MODELS = [
     ("subaru", "subaru-crosstrek_hybrid"),
     ("jeep", "jeep-wrangler_4xe"),
     ("jeep", "jeep-grand_cherokee_4xe"),
+    ("nissan", "nissan-murano"),       # Murano Hybrid; discontinued after 2020 — results likely sparse
+    ("nissan", "nissan-rogue"),        # no full hybrid in US market; included for completeness
 ]
 # Note: Ford Escape / Volvo XC60 Recharge PHEVs aren't reachable by a dedicated
 # model slug on Cars.com — they live under the base model slug (ford-escape,
@@ -75,9 +77,8 @@ COLOR_SLUGS = ["silver", "gray"]
 # Root words that imply a light/neutral exterior (silver, gray, white, etc.).
 # White is included — buyer may want silver OR white since both are "light."
 SILVER_ROOTS = (
-    "silver", "gray", "grey", "white", "chrome", "platinum", "titanium",
-    "stardust", "sterling", "glacier", "frost", "quartz", "lunar",
-    "arctic", "alpine", "pearl",
+    "silver", "gray", "grey", "chrome", "platinum", "titanium",
+    "stardust", "sterling",
 )
 # Strings that veto a color regardless of root-word matches — dark/blue-leaning.
 DARK_COLOR_MARKERS = (
@@ -118,6 +119,8 @@ LEATHER_TRIMS = {
     "crosstrek hybrid": {"hybrid", "limited"},             # leather-trimmed; base/Sport are cloth
     "wrangler 4xe": {"high altitude", "rubicon x", "sahara"},  # leather standard/optional; CONFIRM per listing — many are cloth
     "grand cherokee 4xe": {"limited", "overland", "summit", "trailhawk"},  # base 4xe is cloth
+    "murano hybrid": {"sl", "platinum"},   # SV is cloth; SL/Platinum have leather
+    "rogue": {"sl", "platinum"},           # SV is cloth; no hybrid exists in US — won't match fuel filter
     # Corolla Cross Hybrid: XLE has SofTex; S/SE are fabric
     "corolla cross hybrid": {"xle"},
     # Mustang Mach-E: Premium, First Edition, GT; Select is cloth
@@ -138,11 +141,11 @@ def is_silver(color: str) -> bool:
 
 
 def has_acceptable_interior(interior: str) -> bool:
-    """Pass anything that is not a solid-black interior. Empty = unknown = pass."""
+    """Pass anything that is not a black interior. Empty = unknown = pass."""
     c = (interior or "").lower().strip()
     if not c:
         return True   # unknown interior — don't veto
-    return c not in _BLACK_INTERIORS
+    return not any(b in c for b in _BLACK_INTERIORS)
 
 
 def has_leather(model: str, trim: str) -> bool:
