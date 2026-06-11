@@ -28,6 +28,7 @@ import json
 import sys
 from urllib.parse import urlencode
 
+import re
 import requests
 
 from config import telegram_conf
@@ -102,8 +103,8 @@ LEATHER_TRIMS = {
     "rav4 hybrid": {"xle premium", "xse", "limited"},   # SE is FABRIC — excluded
     "venza": {"le", "xle", "limited"},                   # SofTex standard on all
     "cr-v hybrid": {"ex-l", "sport-l", "sport touring"},
-    "tucson hybrid": {"limited", "n line"},
-    "tucson plug-in hybrid": {"limited", "n line"},   # PHEV uses same leather trims as HEV
+    "tucson hybrid": {"limited"},               # N Line is sport cloth, not leather
+    "tucson plug-in hybrid": {"limited"},       # same — N Line is cloth on PHEV too
     "santa fe hybrid": {"limited", "calligraphy"},
     "elantra hybrid": {"limited"},                    # Limited only; Blue/SE are cloth
     "cx-50 hybrid": {"premium", "premium plus"},          # both CX-50 Hybrid trims are leather
@@ -150,6 +151,35 @@ def has_leather(model: str, trim: str) -> bool:
         return False
     t = (trim or "").lower()
     return any(t.startswith(x) or x in t for x in trims)
+
+
+_LEATHER_RE = re.compile(
+    r"\b(leather|leatherette|sofTex|syntex|nuluxe|h-tex|prima-tex|sensatec)\b", re.I
+)
+_CLOTH_RE = re.compile(r"\b(cloth|fabric|vinyl|canvas|microfiber|suede)\b", re.I)
+
+
+def confirms_leather(interior_text: str):
+    """
+    Check actual seat-material text (e.g. from a spec list or LD+JSON field).
+
+    Returns True  — text explicitly mentions leather/leatherette/synthetic-leather.
+    Returns False — text explicitly mentions cloth/fabric/vinyl.
+    Returns None  — text is empty or ambiguous; caller falls back to has_leather().
+
+    Use this as a hard gate BEFORE has_leather() when the listing gives you real
+    interior-type data (CarMax LD+JSON `vehicleInteriorType`, Cars.com spec list,
+    Carvana detail page). The trim-name lookup in has_leather() is only a fallback
+    for when no material text is available.
+    """
+    t = (interior_text or "").strip()
+    if not t:
+        return None
+    if _LEATHER_RE.search(t):
+        return True
+    if _CLOTH_RE.search(t):
+        return False
+    return None
 
 
 def build_search_url(make: str, model_slug: str, color_slug: str) -> str:

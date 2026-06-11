@@ -29,7 +29,7 @@ from playwright_stealth import Stealth as _Stealth
 import car_search as _cs
 from car_search import (
     YEAR_MIN, PRICE_MIN, PRICE_MAX, MILES_MAX,
-    is_silver, has_acceptable_interior, has_leather,
+    is_silver, has_acceptable_interior, has_leather, confirms_leather,
     search_urls,
     UNVERIFIABLE_SELLERS, SOLD_MARKERS,
 )
@@ -46,11 +46,9 @@ TOP_N = 10
 MIN_MAKES = 4
 # Hard deadline for the entire Cars.com phase (seconds). If we hit it, we use
 # whatever we have plus the CarMax/Carvana results.
-CARS_COM_DEADLINE_SECS = 240
-# How many Cars.com search URLs to fetch per run (32 total is too slow).
-MAX_SEARCH_URLS = 20
-# Per-page nav timeout (ms)
-NAV_TIMEOUT_MS = 20_000
+CARS_COM_DEADLINE_SECS = 360   # 6 min ceiling for the whole Cars.com phase
+MAX_SEARCH_URLS = 24           # fetch more URLs before hitting the ceiling
+NAV_TIMEOUT_MS = 30_000        # 30 s per page (was 20 s; Ford/Santa Fe were timing out)
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +98,7 @@ async def _fetch_search_page(page, url):
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         # Cars.com uses [data-listing-id] on each result LI
-        await page.wait_for_selector("[data-listing-id]", timeout=12_000)
+        await page.wait_for_selector("[data-listing-id]", timeout=20_000)
     except Exception as e:
         print(f"    (skip: {type(e).__name__})")
         return []
@@ -370,13 +368,23 @@ def _ingest_browser_sources():
         model = c.get("model", "").lower()
         trim  = c.get("trim", "").lower()
         source = c.get("source", "")
-        # CarMax: accurate trim → full check. Carvana: model-level only.
-        if source == "carvana":
-            if not _model_has_any_leather(model, _cs):
-                continue
-        else:
-            if not has_leather(model, trim):
-                continue
+
+        # CarMax LD+JSON provides `interior_type` ("Leather Seats", "Cloth Seats", …).
+        # Use confirms_leather() on that first — it's ground truth from the listing.
+        # Fall back to trim-level check only when the field is absent/ambiguous.
+        interior_type = c.get("interior_type", "")
+        leather_result = confirms_leather(interior_type)
+        if leather_result is False:
+            continue   # CarMax says "Cloth Seats" — hard reject
+        if leather_result is None:
+            # No material text: fall back to trim-level check
+            if source == "carvana":
+                if not _model_has_any_leather(model, _cs):
+                    continue
+            else:
+                if not has_leather(model, trim):
+                    continue
+        # leather_result is True → confirmed leather, skip trim check
 
         miles = int(c.get("miles") or 0)
         price = int(c.get("price") or 0)
@@ -470,12 +478,19 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
                 lst["color_fail"] = True
             if lst["interior"] and not has_acceptable_interior(lst["interior"]):
                 lst["interior_fail"] = True
+            # Hard leather check using actual seat-material text from the spec list.
+            # confirms_leather() returns True/False/None; None means fall back to trim.
+            leather_result = confirms_leather(lst.get("interior", ""))
+            if leather_result is False:
+                lst["leather_fail"] = True   # spec list says "Cloth" — hard reject
+            # (leather_result True or None keeps the candidate; trim already passed)
 
         finalists = [
             lst for lst in candidates
             if not lst.get("gone")
             and not lst.get("color_fail")
             and not lst.get("interior_fail")
+            and not lst.get("leather_fail")
         ]
         print(f"[scrape] {len(finalists)} finalists after detail checks")
 
