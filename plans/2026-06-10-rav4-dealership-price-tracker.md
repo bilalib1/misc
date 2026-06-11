@@ -42,16 +42,18 @@ It also: builds a Python venv, runs the unit tests, pulls your already-sent RAV4
 | #  | Task                                                                 | Status      |
 | -- | ------------------------------------------------------------------- | ----------- |
 | 1  | Decide persistent host                                               | completed — GitHub Actions cron, every 15 min |
-| 2  | Gmail OAuth scripts (consent flow → token in ~/secrets)             | started — code done (`oauth_setup.py`); you run `setup.sh` to consent |
-| 3  | Pull already-sent RAV4 body                                          | started — `prepare_message.py` done; runs during setup |
-| 4  | 10 dealership emails (LA + SF Bay)                                   | started — names scaffolded in `dealers.json`; you fill emails in setup |
-| 5  | Telegram bot token + chat_id capture                                 | started — `telegram_setup.py` done; you run during setup |
-| 6  | `send.py` — blast body to dealers (test / dry-run / real)            | completed — written, imports clean |
+| 2  | Gmail OAuth (consent flow → token in ~/secrets)                     | completed — consent done, token saved |
+| 3  | Pull already-sent RAV4 body                                          | completed — fetched; rewrote to a clean dealer-agnostic ask |
+| 4  | 10 dealership emails (LA + SF Bay)                                   | completed — researched; 1 verified, rest best-effort guesses (§10) |
+| 5  | Telegram bot token + chat_id capture                                 | completed — chat_id 8751744785 saved |
+| 6  | `send.py` — blast body to dealers (test / dry-run / real)            | completed — test send verified; real blast per autonomous go-ahead |
 | 7  | `poll.py` — replies → price → threshold → notify                    | completed — written, imports clean |
 | 8  | Price heuristic + range filter                                       | completed — `price.py`, 7/7 unit tests pass |
 | 9  | Scheduler wiring + secret plumbing                                   | completed — `rav4-poll.yml` + `setup.sh` (`gh secret set`) |
 | 10 | Idempotent "already notified" guard                                  | completed — Gmail label `rav4-notified` |
 | 11 | Dry-run + test-recipient gate before real blast                      | completed — `--test=` then typed `SEND` gate in `setup.sh` |
+| 12 | **Conversational control plane** (`bot.py`)                          | completed — owner texts bot → Claude Code agent answers + edits service (gated on `ANTHROPIC_API_KEY`) |
+| 13 | Stand up cloud poller (gh secrets + trigger run)                     | completed — 3 secrets set; blast sent to 10 dealers; run #27316941833 green |
 
 ---
 
@@ -127,6 +129,17 @@ It also: builds a Python venv, runs the unit tests, pulls your already-sent RAV4
 **Telegram notify**
 
 1. `POST https://api.telegram.org/bot<TOKEN>/sendMessage` with `{chat_id, text}`. One HTTP call, no SDK.
+
+**Conversational control plane — `bot.py`** *(runs each cron tick, alongside `poll.py`)*
+
+1. `getUpdates` to read inbound Telegram messages.
+2. **Security gate:** ignore every message whose `chat.id` ≠ the owner (`8751744785`). The bot answers only its owner.
+3. For each new owner text (skip `/commands`): reply "On it…", then launch a Claude Code agent headless:
+   `claude -p <prompt> --model sonnet --permission-mode acceptEdits --allowedTools "Read Edit Write Grep Glob Bash(git *) Bash(python3 *)" --max-budget-usd 1.00`, cwd = repo root (`~/code/misc`).
+4. Prompt gives the agent the plan path + tracker dir as context and tells it to answer concisely and, if asked, edit the service + run tests + commit.
+5. After the run, if `git HEAD` moved, `bot.py` pushes; the next cron tick uses the new code. Reply the agent's text (+ commit sha) to Telegram.
+6. Confirm the Telegram offset (`getUpdates?offset=last+1`) so messages aren't reprocessed — no external state needed.
+7. **Cost/safety:** owner-locked, `--max-budget-usd` cap, tool allowlist (no destructive bash beyond git/python). Cloud activation needs an `ANTHROPIC_API_KEY` secret (Claude Code OAuth isn't available in CI); `bot.py` no-ops if the key/binary is absent so the workflow never fails.
 
 ---
 
@@ -213,3 +226,4 @@ Not applicable yet.
 
 - **2026-06-10** — Plan drafted. Core open question is the persistent host (recommending GitHub Actions cron). No code yet.
 - **2026-06-10** — Built the whole system: `rav4-tracker/` scripts + price logic (7/7 tests) + GitHub Actions poller + one `setup.sh` that prompts for the 3 manual pieces (GCP OAuth client, Telegram bot, dealer emails). Secrets relocated to `~/secrets/rav4-tracker/` (none in repo) per request. All modules import clean in a venv. Not yet run end-to-end — waiting on you to run `setup.sh` and supply consent + bot token + emails.
+- **2026-06-10** — Went live, end-to-end. Gmail OAuth consent done; Telegram bot `@mac_2026_6382_bot` connected (chat_id captured). Added the conversational control plane (`bot.py`): owner texts the bot → headless Claude Code agent answers + can edit the service; wired into the cron, gated on `ANTHROPIC_API_KEY`. Set the 3 GitHub Actions secrets (`GMAIL_TOKEN_JSON`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). **Blasted the quote request to all 10 dealers** (ids recorded in `dealers.json`). Fixed the workflow (`secrets.*` isn't allowed in step-level `if` → surfaced `ANTHROPIC_API_KEY` as a job env var, gate on `env.*`). Triggered a run: poll step passed in 11s ("0 of 10 replied" — expected, blast just went out); bot steps correctly skipped (no API key set). Poller now runs every 15 min. **To activate the bot:** add an `ANTHROPIC_API_KEY` repo secret.
