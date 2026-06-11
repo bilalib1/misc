@@ -216,6 +216,18 @@ All code under `~/code/misc/rav4-tracker/` unless noted.
 
 ---
 
+## 16b. Follow-ups / Future Work
+
+- **Activate the conversational bot on the Claude Max subscription.** Run, in a *real interactive terminal* (not a captured/non-interactive shell — both commands are interactive: `setup-token` opens a browser and waits, `gh secret set` waits for a pasted token + Enter):
+  ```bash
+  claude setup-token                                          # mints a ~1-year OAuth token
+  gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo bilalib1/misc  # paste the token
+  ```
+  Workflow + `bot.py` already accept `CLAUDE_CODE_OAUTH_TOKEN` as an alternative to `ANTHROPIC_API_KEY`. Set only one (API key wins if both present). First attempt failed to land the secret — almost certainly because the commands were run in a non-interactive shell. Token expires in ~1 year; bot no-ops cleanly when it does.
+- **Replace the two bounced dealer addresses** in `dealers.json` (hard "Address not found" NDRs on 2026-06-10): `internetsales@sftoyota.com` (San Francisco Toyota) and `sales@toyotaofglendale.com` (Toyota of Glendale). Find working addresses, then re-run `python send.py` (it re-blasts all; only resend the two if you want to avoid duplicates).
+
+---
+
 ## 17. Postmortems
 
 Not applicable yet.
@@ -227,3 +239,4 @@ Not applicable yet.
 - **2026-06-10** — Plan drafted. Core open question is the persistent host (recommending GitHub Actions cron). No code yet.
 - **2026-06-10** — Built the whole system: `rav4-tracker/` scripts + price logic (7/7 tests) + GitHub Actions poller + one `setup.sh` that prompts for the 3 manual pieces (GCP OAuth client, Telegram bot, dealer emails). Secrets relocated to `~/secrets/rav4-tracker/` (none in repo) per request. All modules import clean in a venv. Not yet run end-to-end — waiting on you to run `setup.sh` and supply consent + bot token + emails.
 - **2026-06-10** — Went live, end-to-end. Gmail OAuth consent done; Telegram bot `@mac_2026_6382_bot` connected (chat_id captured). Added the conversational control plane (`bot.py`): owner texts the bot → headless Claude Code agent answers + can edit the service; wired into the cron, gated on `ANTHROPIC_API_KEY`. Set the 3 GitHub Actions secrets (`GMAIL_TOKEN_JSON`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). **Blasted the quote request to all 10 dealers** (ids recorded in `dealers.json`). Fixed the workflow (`secrets.*` isn't allowed in step-level `if` → surfaced `ANTHROPIC_API_KEY` as a job env var, gate on `env.*`). Triggered a run: poll step passed in 11s ("0 of 10 replied" — expected, blast just went out); bot steps correctly skipped (no API key set). Poller now runs every 15 min. **To activate the bot:** add an `ANTHROPIC_API_KEY` repo secret.
+- **2026-06-10** — Added subscription auth path: `bot.py` + workflow now accept `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) so the bot can run on a Claude Max plan instead of metered API billing. Two dealer addresses hard-bounced (`internetsales@sftoyota.com`, `sales@toyotaofglendale.com`); other 8 delivered. The one GitHub Action "failure" email was the single broken-workflow parse error (`secrets.*` in step `if`), already fixed — later runs are green. Open follow-ups moved to §16b.
