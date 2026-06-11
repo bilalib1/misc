@@ -12,9 +12,19 @@ import paths
 def main():
     paths.ensure()
     tok = sys.argv[1].strip()
-    print("Now open Telegram and send any message (e.g. 'hi') to your bot...")
+
+    me = requests.get(f"https://api.telegram.org/bot{tok}/getMe", timeout=20).json()
+    if not me.get("ok"):
+        raise SystemExit(f"That bot token looks wrong: {me.get('description', me)}")
+    uname = me["result"]["username"]
+    # A leftover webhook makes getUpdates return nothing; clear it.
+    requests.get(f"https://api.telegram.org/bot{tok}/deleteWebhook", timeout=20)
+
+    print(f"Your bot is @{uname}.")
+    print(f"  Open  https://t.me/{uname}  -> tap START -> send any message (e.g. 'hi').")
+    print("  (Messaging BotFather or any other chat will NOT work.)")
     chat = None
-    for _ in range(60):  # ~2 min
+    for _ in range(90):  # ~3 min
         r = requests.get(f"https://api.telegram.org/bot{tok}/getUpdates", timeout=20).json()
         for u in r.get("result", []):
             msg = u.get("message") or u.get("edited_message")
@@ -24,7 +34,7 @@ def main():
             break
         time.sleep(2)
     if not chat:
-        raise SystemExit("No message received. Re-run and message the bot promptly.")
+        raise SystemExit(f"No message seen. Make sure you messaged @{uname} (not BotFather) and re-run.")
     paths.TELEGRAM.write_text(json.dumps({"bot_token": tok, "chat_id": chat}))
     requests.get(
         f"https://api.telegram.org/bot{tok}/sendMessage",
