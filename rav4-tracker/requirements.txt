@@ -2,3 +2,7 @@ google-auth
 google-auth-oauthlib
 google-api-python-client
 requests
+# Browser scraper (CarMax + Carvana bypass)
+playwright>=1.60
+playwright-stealth>=2.0
+pycookiecheat>=0.8   # Chrome cookie extraction (macOS)

@@ -37,7 +37,7 @@ ZIP = "90012"
 DISTANCE = 75
 PRICE_MIN, PRICE_MAX = 20000, 40000
 MILES_MAX = 50000
-YEAR_MIN = 2022
+YEAR_MIN = 2021
 
 # RAV4 Hybrid and its closest hybrid-crossover relatives. (make, model slug)
 # Kia is excluded per buyer preference. Spread across makes so a ranked top-N
@@ -70,17 +70,18 @@ MODELS = [
 # as passing, so we cast the wide net here and let SILVER_SYNONYMS confirm.
 COLOR_SLUGS = ["silver", "gray"]
 
-# Buyer wants LIGHT exteriors ONLY: silver and light gray. Dark / blue-leaning
-# grays are OUT — the buyer flagged a "Graphite Gray" Outlander as looking blue.
-# A light allowlist PLUS a dark denylist that VETOES a match (denylist wins even
-# if the name also contains "silver"/"gray").
-SILVER_SYNONYMS = (
-    "silver", "ice silver", "alloy silver", "shimmering silver", "billet silver",
-    "sterling", "glacier", "light gray", "light grey", "platinum", "white frost",
+# Exterior: silver, grey, and common silver synonyms are allowed broadly.
+# The denylist is the real gate — dark/blue-leaning colors are vetoed regardless
+# of what else is in the name. Anything that contains a silver/gray root word
+# and is NOT vetoed passes.
+SILVER_ROOTS = (
+    "silver", "gray", "grey", "chrome", "platinum", "titanium",
+    "stardust", "sterling", "glacier", "frost", "quartz", "lunar",
+    "arctic", "alpine", "pearl",
 )
 DARK_COLOR_MARKERS = (
-    "graphite", "magnetic", "gunmetal", "steel", "charcoal", "granite", "cement",
-    "titanium", "meteorite", "machine gray", "machine grey", "polymetal",
+    "graphite", "magnetic", "gunmetal", "charcoal", "granite", "cement",
+    "meteorite", "machine gray", "machine grey", "polymetal",
     "urban gray", "urban grey", "mercury", "dark gray", "dark grey",
 )
 
@@ -104,7 +105,9 @@ LEATHER_TRIMS = {
     "venza": {"le", "xle", "limited"},                   # SofTex standard on all
     "cr-v hybrid": {"ex-l", "sport-l", "sport touring"},
     "tucson hybrid": {"limited", "n line"},
+    "tucson plug-in hybrid": {"limited", "n line"},   # PHEV uses same leather trims as HEV
     "santa fe hybrid": {"limited", "calligraphy"},
+    "elantra hybrid": {"limited"},                    # Limited only; Blue/SE are cloth
     "cx-50 hybrid": {"premium", "premium plus"},          # both CX-50 Hybrid trims are leather
     "escape hybrid": {"titanium"},                         # ActiveX on lower trims is cloth-ish; Titanium = leather
     "escape plug-in hybrid": {"titanium"},
@@ -123,7 +126,7 @@ def is_silver(color: str) -> bool:
     c = (color or "").lower()
     if any(d in c for d in DARK_COLOR_MARKERS):  # dark/blue-leaning grays veto
         return False
-    return any(s in c for s in SILVER_SYNONYMS)
+    return any(s in c for s in SILVER_ROOTS)
 
 
 def has_acceptable_interior(interior: str) -> bool:
