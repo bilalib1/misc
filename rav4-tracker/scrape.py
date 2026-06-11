@@ -625,9 +625,11 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
                 print(f"    (skip out-of-area zip {lst.get('seller_zip')} — {lst['title'][:50]})")
                 continue
             model, trim = _parse_model_trim(lst["title"])
-            if model and is_blocked_model(model):
+            if not model:
+                continue   # unrecognised model — can't confirm leather, reject
+            if is_blocked_model(model):
                 continue
-            if model and not has_leather(model, trim):
+            if not has_leather(model, trim):
                 continue
             candidates.append(lst)
         print(f"[scrape] {len(candidates)} after basic filters")
