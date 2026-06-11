@@ -176,10 +176,11 @@ async def _extract_card(card):
         except Exception:
             pass
 
-    price  = int(details["price"])   if details.get("price")   else None
-    miles  = int(details["mileage"]) if details.get("mileage") else None
-    ext_color = (details.get("exteriorColor") or "").lower()
-    vin    = details.get("vin", "")
+    price      = int(details["price"])   if details.get("price")   else None
+    miles      = int(details["mileage"]) if details.get("mileage") else None
+    ext_color  = (details.get("exteriorColor") or "").lower()
+    vin        = details.get("vin", "")
+    seller_zip = str((details.get("seller") or {}).get("zip", "") or "")
 
     # Fallback: parse innerText for price/miles/city when card JSON is missing them
     text  = await card.inner_text()
@@ -215,11 +216,32 @@ async def _extract_card(card):
         "ext_color": ext_color,
         "interior": "",
         "vin": vin,
+        "seller_zip": seller_zip,
         "verified": bool(vin),  # VIN from card JSON is sufficient
     }
 
 
 _CLOUDFLARE_MARKERS = ("just a moment", "checking your browser", "challenge-platform")
+
+# SoCal zip range: covers LA, Orange County, Ventura, Riverside/IE, San Diego.
+# Excludes Bay Area (94000+), Sacramento, Central Valley (93300+), etc.
+# Cars.com's distance filter should handle this already, but we double-check
+# because mislabeled dealer zips can slip through (e.g. a Bay Area listing at $27k).
+_SOCAL_ZIP_MIN = 90000
+_SOCAL_ZIP_MAX = 93299
+
+
+def _is_la_area_zip(zip_str: str) -> bool:
+    """Return True if the seller zip is within greater SoCal (~75mi of LA).
+    Unknown zips pass through so we never drop listings we can't locate.
+    """
+    if not zip_str:
+        return True
+    try:
+        z = int(zip_str.strip()[:5])
+        return _SOCAL_ZIP_MIN <= z <= _SOCAL_ZIP_MAX
+    except (ValueError, TypeError):
+        return True
 
 
 async def _fetch_detail(page, listing):
@@ -579,6 +601,9 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
             if lst["miles"] and lst["miles"] > MILES_MAX:
                 continue
             if lst["ext_color"] and not is_silver(lst["ext_color"]):
+                continue
+            if not _is_la_area_zip(lst.get("seller_zip", "")):
+                print(f"    (skip out-of-area zip {lst.get('seller_zip')} — {lst['title'][:50]})")
                 continue
             model, trim = _parse_model_trim(lst["title"])
             if model and is_blocked_model(model):
