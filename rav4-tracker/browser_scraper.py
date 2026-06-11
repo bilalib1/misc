@@ -256,7 +256,43 @@ def _get_carmax_stock_urls(page):
 # CarMax LD+JSON reports: "Hybrid", "Electric", "Gas", "Diesel", "Flex".
 # Hybrid = has a combustion engine + electric motor. Pure EVs (Tesla etc.) are excluded.
 _HYBRID_FUELS = {"hybrid", "plug-in hybrid", "phev"}
-_HYBRID_TITLE_RE = re.compile(r"\b(hybrid|phev|plug.?in)\b", re.I)
+# Also match Lexus/BMW h-suffix designators: 350h, 250h, 450h, 30e, 40e, etc.
+_HYBRID_TITLE_RE = re.compile(r"\b(hybrid|phev|plug.?in|\d{2,3}[eh])\b", re.I)
+
+# Carvana URL slugs that differ from the Cars.com model slug convention.
+# Used when the direct _ → - conversion produces an unrecognised Carvana slug
+# (detected when the page shows the full ~45k catalog instead of model results).
+CARVANA_SLUG_OVERRIDES = {
+    "lexus-nx-350h":       "lexus-nx",     # Carvana uses just lexus-nx for all NX trims
+    "lexus-ux-250h":       "lexus-ux",     # same pattern
+    "mazda-cx-50-hybrid":  "mazda-cx-50",  # no fuel-type suffix in Carvana slug
+    "volvo-xc60-recharge": "volvo-xc60",   # Recharge is a Volvo sub-brand, not a Carvana slug
+}
+
+
+def _carvana_trim_from_text(name: str, desc: str) -> str:
+    """Extract the trim level from Carvana's name or description.
+
+    Carvana LD+JSON name is often just "2024 Toyota RAV4 Hybrid" (no trim).
+    The description is more complete: "Used 2024 Toyota RAV4 Hybrid XLE Premium
+    with 19,739 miles."  This function grabs whatever comes after the fuel-type
+    designator (Hybrid / PHEV / Recharge / 350h / 250h …) and before "with N miles".
+    Returns empty string if no trim is identifiable.
+    """
+    _TRIM_PAT = re.compile(
+        r"(?:Used|New\s+)?\d{4}\s+\S+\s+(?:\S+\s+){1,3}"
+        r"(?:Hybrid|Plug-?in\s+Hybrid|PHEV|Recharge|\d{2,3}[eh])\s+"
+        r"(.+?)(?:\s+with\b|\s+\d[\d,]*\s+miles|$)",
+        re.I,
+    )
+    for text in (name, desc):
+        m = _TRIM_PAT.search(text or "")
+        if m:
+            t = m.group(1).strip()
+            # Reject noise: "with", digits-only, single letters
+            if t and not re.match(r"^(with\b|\d)", t, re.I) and len(t) > 1:
+                return t
+    return ""
 
 
 def _is_hybrid(listing):
@@ -375,11 +411,9 @@ def scrape_carmax(zip_code="90012", radius=75, year_min=2022,
 
 
 def _carvana_model_slug(cars_com_slug):
-    """Convert a Cars.com model slug to a Carvana path segment.
-
-    Cars.com uses underscores (toyota-rav4_hybrid); Carvana uses hyphens (toyota-rav4-hybrid).
-    """
-    return cars_com_slug.replace("_", "-")
+    """Convert a Cars.com model slug to a Carvana path segment, applying known overrides."""
+    base = cars_com_slug.replace("_", "-")
+    return CARVANA_SLUG_OVERRIDES.get(base, base)
 
 
 def scrape_carvana(zip_code="90012", year_min=2022,
@@ -454,11 +488,12 @@ def scrape_carvana(zip_code="90012", year_min=2022,
                     if isinstance(miles, dict):
                         miles = miles.get("value")
 
+                    name = block.get("name", "")
                     desc = block.get("description", "")
-                    trim_match = re.search(
-                        r"(?:Used|New)\s+\d{4}\s+\S+\s+\S+\s+(\S+)", desc
-                    )
-                    trim = trim_match.group(1) if trim_match else ""
+                    # Extract trim from name/description; append to title so
+                    # _parse_model_trim in scrape.py can confirm leather by trim spec.
+                    trim = _carvana_trim_from_text(name, desc)
+                    full_title = f"{name} {trim}".strip() if trim and trim.lower() not in name.lower() else name
 
                     listing_url = (block.get("offers") or {}).get("url", "")
                     if not listing_url:
@@ -466,7 +501,7 @@ def scrape_carvana(zip_code="90012", year_min=2022,
                         listing_url = f"https://www.carvana.com/vehicle/{sku}" if sku else ""
 
                     rec = {
-                        "title": block.get("name", ""),
+                        "title": full_title,
                         "make": block.get("manufacturer") or block.get("brand", ""),
                         "model": block.get("model", ""),
                         "trim": trim,

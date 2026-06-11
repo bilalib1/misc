@@ -444,42 +444,54 @@ def _make(listing):
     return parts[1].lower() if len(parts) > 1 else "unknown"
 
 
-def _select_diverse(listings, top_n=TOP_N, min_makes=MIN_MAKES, max_per_make=2):
-    """Return up to top_n listings, best value first, max max_per_make per brand.
+def _select_incremental(listings, top_n=5, brand_penalty=0.12):
+    """Greedy selection with incremental brand + model diversity penalties.
 
-    Greedy pass respects the per-make cap. If the result still doesn't cover
-    min_makes distinct makes, swap out the worst-value car to pull in the
-    best-scoring car from each missing make.
+    Each slot is filled by picking the highest *effective* score from the
+    remaining pool, where effective score = raw_score × (1 − total_penalty).
+
+    Penalty per pick:
+      • +brand_penalty   for each previously selected car of the same brand
+      • +brand_penalty   additionally for same brand AND same model  (2× total)
+
+    Example with brand_penalty=0.12:
+      First Toyota:          no penalty   → effective = raw
+      Second Toyota (diff model):  −12%   → effective = raw × 0.88
+      Second Toyota RAV4:   −12% brand −12% model = −24%  → effective = raw × 0.76
+      Third Toyota:         −24% brand + any model penalty
+
+    A great same-brand car still wins if it's proportionally better; the penalty
+    is a "nudge toward diversity", not a hard cap.
     """
-    # Higher score = better; sort descending so index 0 is the best car
-    ranked = sorted(listings, key=_score, reverse=True)
+    selected = []
+    remaining = list(listings)
+    brand_counts: dict = {}
+    model_counts: dict = {}
 
-    make_counts: dict = {}
-    top = []
-    remainder = []
-    for lst in ranked:
-        m = _make(lst)
-        if make_counts.get(m, 0) < max_per_make and len(top) < top_n:
-            top.append(lst)
-            make_counts[m] = make_counts.get(m, 0) + 1
-        else:
-            remainder.append(lst)
-
-    # Diversity boost: if we still fall short of min_makes, swap in best from missing makes
-    makes_in_top = {_make(lst) for lst in top}
-    for lst in remainder:
-        if len(makes_in_top) >= min_makes:
+    for _ in range(top_n):
+        if not remaining:
             break
-        m = _make(lst)
-        if m not in makes_in_top:
-            top.sort(key=_score, reverse=True)
-            top.pop()   # drop the last = lowest-scoring car
-            top.append(lst)
-            make_counts[m] = make_counts.get(m, 0) + 1
-            makes_in_top.add(m)
+        best_car, best_eff = None, float("-inf")
+        for car in remaining:
+            make          = _make(car)
+            model, _trim  = _parse_model_trim(car.get("title", ""))
+            n_brand       = brand_counts.get(make, 0)
+            n_model       = model_counts.get((make, model), 0) if model else 0
+            penalty       = n_brand * brand_penalty + n_model * brand_penalty
+            effective     = _score(car) * max(0.0, 1.0 - penalty)
+            if effective > best_eff:
+                best_eff, best_car = effective, car
+        if best_car is None:
+            break
+        selected.append(best_car)
+        remaining.remove(best_car)
+        make         = _make(best_car)
+        model, _trim = _parse_model_trim(best_car.get("title", ""))
+        brand_counts[make] = brand_counts.get(make, 0) + 1
+        if model:
+            model_counts[(make, model)] = model_counts.get((make, model), 0) + 1
 
-    top.sort(key=_score, reverse=True)
-    return top
+    return selected
 
 
 # ---------------------------------------------------------------------------
@@ -690,8 +702,8 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
     # -- Step 6: split into two price buckets, top 5 each --
     under30 = [l for l in verified if (l.get("price") or 0) <  30_000]
     over30  = [l for l in verified if (l.get("price") or 0) >= 30_000]
-    top_under = _select_diverse(under30, top_n=5, min_makes=3, max_per_make=2)
-    top_over  = _select_diverse(over30,  top_n=5, min_makes=3, max_per_make=2)
+    top_under = _select_incremental(under30, top_n=5)
+    top_over  = _select_incremental(over30,  top_n=5)
     top = top_under + top_over
     print(f"[scrape] {len(top_under)} under $30k / {len(top_over)} $30-40k")
 
