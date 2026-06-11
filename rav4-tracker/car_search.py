@@ -84,11 +84,14 @@ DARK_COLOR_MARKERS = (
     "urban gray", "urban grey", "mercury", "dark gray", "dark grey",
 )
 
-# Buyer also wants a LIGHT / warm INTERIOR (not a black cabin): tan, brown,
-# beige, off-white, eggshell, cream and the like.
-LIGHT_INTERIOR_SYNONYMS = (
+# Interior: buyer relaxed this from "warm/light only" to "anything but an
+# all-black cabin." Warm tones (tan/beige/cream) still pass, and so do neutral
+# grays and two/three-tone combos. Only a solid black interior is vetoed.
+ACCEPTABLE_INTERIOR_SYNONYMS = (
     "tan", "brown", "beige", "off-white", "off white", "eggshell", "cream",
     "saddle", "macchiato", "camel", "almond", "sand", "ivory", "parchment",
+    "gray", "grey", "graphite", "ash", "stone", "boulder", "greige", "ceramic",
+    "two-tone", "two tone", "three-tone", "three tone", "3-tone", "light",
 )
 
 # Trims whose STANDARD seat is leather or leather-like (SofTex/SynTex/H-Tex/
@@ -123,9 +126,13 @@ def is_silver(color: str) -> bool:
     return any(s in c for s in SILVER_SYNONYMS)
 
 
-def has_light_interior(interior: str) -> bool:
+def has_acceptable_interior(interior: str) -> bool:
     c = (interior or "").lower()
-    return any(s in c for s in LIGHT_INTERIOR_SYNONYMS)
+    if not c:
+        return False
+    if c.strip() in ("black", "jet black", "ebony"):  # solid black cabin vetoed
+        return False
+    return any(s in c for s in ACCEPTABLE_INTERIOR_SYNONYMS)
 
 
 def has_leather(model: str, trim: str) -> bool:
