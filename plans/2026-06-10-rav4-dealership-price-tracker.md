@@ -222,7 +222,7 @@ All code under `~/code/misc/rav4-tracker/` unless noted.
 A side task that reuses the Telegram channel: find the best used-car deals and text a ranked top-N. Helper: `car_search.py`. Buyer wants a RAV4-Hybrid-like car: **silver, leather seats, hybrid, LA area, 2022+, under 50k mi, $20k–$40k.**
 
 Procedure:
-1. **Build search URLs** — `python car_search.py urls`. One Cars.com filtered URL per (model, color). Models = RAV4 Hybrid + close relatives (Venza, CR-V Hybrid, Tucson/Santa Fe Hybrid, Sportage/Sorento Hybrid). Colors = `silver` **and** `gray` (many silver cars are filed under gray).
+1. **Build search URLs** — `python car_search.py urls`. One Cars.com filtered URL per (model, color). Models = RAV4 Hybrid + close relatives (Venza, CR-V Hybrid, Tucson/Santa Fe Hybrid, CX-50 Hybrid). **Kia is excluded per buyer preference.** Colors = `silver` **and** `gray` (many silver cars are filed under gray).
 2. **Extract listings** — fetch each URL with a Claude agent / WebFetch (Cars.com renders results client-side, so a plain `requests.get` won't see them). Each page yields ~20–50 rows: year/trim, price, mileage, color, dealer + city, and a `…/vehicledetail/<uuid>/` link.
 3. **Filter** —
    - **Location:** greater LA / SoCal only; drop out-of-state and far (San Diego/Vegas/Fresno).
@@ -233,6 +233,8 @@ Procedure:
 6. **Send** — `python car_search.py send shortlist.json` (or `send_ranked()`): one brief numbered line each, `view` hyperlinked to the listing, best first.
 
 First run (2026-06-10): texted a verified top 10 — RAV4 Hybrid XLE Premium / XSE, Kia Sorento Hybrid EX / SX Prestige, Tucson Hybrid Limited, CR-V Hybrid Sport Touring — all silver/grey + leather (trim-spec-verified), $27,995–$39,785, LA-area. (Initial pass mistakenly included two RAV4 SEs off the dealer's leather tag; corrected after checking the trim spec — SE is fabric.)
+
+Re-run (2026-06-10): buyer asked to exclude Kia entirely; resent a Kia-free top 10 spanning Toyota (Venza XLE, RAV4 XSE / XLE Premium), Hyundai (Tucson N Line / Limited), Honda (CR-V Sport-L ×2 / Sport Touring), and Mazda (CX-50 Hybrid Premium / Premium Plus), $25,999–$39,981. Dropped Kia from `MODELS` + `LEATHER_TRIMS`; added Mazda CX-50 Hybrid (Premium + Premium Plus are leather). Several listings from the first run had already sold, so finalists were re-verified live before sending.
 
 ---
 

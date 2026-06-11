@@ -32,14 +32,14 @@ MILES_MAX = 50000
 YEAR_MIN = 2022
 
 # RAV4 Hybrid and its closest hybrid-crossover relatives. (make, model slug)
+# Kia is excluded per buyer preference.
 MODELS = [
     ("toyota", "toyota-rav4_hybrid"),
     ("toyota", "toyota-venza"),
     ("honda", "honda-cr_v_hybrid"),
     ("hyundai", "hyundai-tucson_hybrid"),
     ("hyundai", "hyundai-santa_fe_hybrid"),
-    ("kia", "kia-sportage_hybrid"),
-    ("kia", "kia-sorento_hybrid"),
+    ("mazda", "mazda-cx_50_hybrid"),
 ]
 
 # Query both color buckets; many "silver" cars are filed under gray. The buyer
@@ -65,8 +65,7 @@ LEATHER_TRIMS = {
     "cr-v hybrid": {"ex-l", "sport-l", "sport touring"},
     "tucson hybrid": {"limited", "n line"},
     "santa fe hybrid": {"limited", "calligraphy"},
-    "sportage hybrid": {"ex", "sx", "sx prestige", "x-line prestige", "x-pro prestige"},
-    "sorento hybrid": {"ex", "sx", "sx prestige"},
+    "cx-50 hybrid": {"premium", "premium plus"},          # both CX-50 Hybrid trims are leather
 }
 
 
