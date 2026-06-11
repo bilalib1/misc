@@ -223,25 +223,36 @@ async def _extract_card(card):
 
 _CLOUDFLARE_MARKERS = ("just a moment", "checking your browser", "challenge-platform")
 
-# SoCal zip range: covers LA, Orange County, Ventura, Riverside/IE, San Diego.
-# Excludes Bay Area (94000+), Sacramento, Central Valley (93300+), etc.
-# Cars.com's distance filter should handle this already, but we double-check
-# because mislabeled dealer zips can slip through (e.g. a Bay Area listing at $27k).
-_SOCAL_ZIP_MIN = 90000
-_SOCAL_ZIP_MAX = 93299
+# Allowed 3-digit zip prefixes for the greater LA area (~75mi radius).
+# Using prefixes rather than a simple numeric range because LA County extends
+# into the 935xx block (Palmdale/Lancaster) while the 933xx and 934xx blocks
+# in between are Bakersfield/Visalia (too far).
+#
+# Covers: LA County (900-919), Inland Empire/Riverside (917-925),
+#         Orange County (926-928), Ventura County (930-931),
+#         Palmdale/Lancaster LA County (935).
+# Excludes: 929 (Palm Springs ~100mi), 932 (Central Coast >100mi),
+#            933/934 (Bakersfield/Visalia), 936+ (Fresno/Central Valley),
+#            940+ (Bay Area/Northern CA), and all non-CA zips.
+_LA_AREA_ZIP_PREFIXES = frozenset({
+    "900","901","902","903","904","905","906","907","908","909",
+    "910","911","912","913","914","915","916","917","918","919",
+    "920","921","922","923","924","925","926","927","928",
+    "930","931",
+    "935",  # Palmdale / Lancaster (LA County, ~60mi from downtown)
+})
 
 
 def _is_la_area_zip(zip_str: str) -> bool:
-    """Return True if the seller zip is within greater SoCal (~75mi of LA).
-    Unknown zips pass through so we never drop listings we can't locate.
+    """Return True if the seller zip is within greater LA (~75mi).
+    Unknown zips pass through so we never silently drop unlocatable listings.
     """
     if not zip_str:
         return True
-    try:
-        z = int(zip_str.strip()[:5])
-        return _SOCAL_ZIP_MIN <= z <= _SOCAL_ZIP_MAX
-    except (ValueError, TypeError):
+    z = zip_str.strip()
+    if len(z) < 3:
         return True
+    return z[:3] in _LA_AREA_ZIP_PREFIXES
 
 
 async def _fetch_detail(page, listing):
