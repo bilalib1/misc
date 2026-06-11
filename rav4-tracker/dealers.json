@@ -3,60 +3,70 @@
     "name": "Toyota of Downtown LA",
     "region": "LA",
     "email": "BenGirmay@toyotadowntownla.edealerhub.com",
-    "confidence": "high"
+    "confidence": "high",
+    "sent_msg_id": "19eb438c330531d2"
   },
   {
     "name": "Stevens Creek Toyota (San Jose)",
     "region": "SF",
     "email": "jwei@sctoyota.com",
-    "confidence": "med-high"
+    "confidence": "med-high",
+    "sent_msg_id": "19eb438cc1665d5f"
   },
   {
     "name": "Toyota Sunnyvale",
     "region": "SF",
     "email": "toyotasunnyvale@digitalairstrike.com",
-    "confidence": "medium"
+    "confidence": "medium",
+    "sent_msg_id": "19eb438d6347aa49"
   },
   {
     "name": "Longo Toyota (El Monte)",
     "region": "LA",
     "email": "sales@longotoyota.com",
-    "confidence": "low-med"
+    "confidence": "low-med",
+    "sent_msg_id": "19eb438dffd75851"
   },
   {
     "name": "Toyota Santa Monica",
     "region": "LA",
     "email": "santiagogutierrez@toyotasantamonica.com",
-    "confidence": "low-med"
+    "confidence": "low-med",
+    "sent_msg_id": "19eb438e9023aa88"
   },
   {
     "name": "Toyota of Glendale",
     "region": "LA",
     "email": "sales@toyotaofglendale.com",
-    "confidence": "low"
+    "confidence": "low",
+    "sent_msg_id": "19eb438f01a1553d"
   },
   {
     "name": "City Toyota (Daly City)",
     "region": "SF",
     "email": "sales@citytoyota.com",
-    "confidence": "low"
+    "confidence": "low",
+    "sent_msg_id": "19eb438fb9fa7c12"
   },
   {
     "name": "Toyota of Berkeley",
     "region": "SF",
     "email": "sales@toyotaofberkeley.com",
-    "confidence": "low"
+    "confidence": "low",
+    "sent_msg_id": "19eb43902d301b27"
   },
   {
     "name": "San Francisco Toyota",
     "region": "SF",
     "email": "internetsales@sftoyota.com",
-    "confidence": "low"
+    "confidence": "low",
+    "sent_msg_id": "19eb4390cf624616"
   },
   {
     "name": "Toyota of Hollywood",
     "region": "LA",
     "email": "internetsales@hollywoodtoyota.com",
-    "confidence": "low"
+    "confidence": "low",
+    "sent_msg_id": "19eb439171f783af"
   }
 ]
