@@ -1,12 +1,62 @@
 [
-  {"name": "Longo Toyota (El Monte)",        "region": "LA",  "email": ""},
-  {"name": "Toyota of Downtown LA",          "region": "LA",  "email": ""},
-  {"name": "Toyota Santa Monica",            "region": "LA",  "email": ""},
-  {"name": "Toyota of Hollywood",            "region": "LA",  "email": ""},
-  {"name": "Toyota of Glendale",             "region": "LA",  "email": ""},
-  {"name": "San Francisco Toyota",           "region": "SF",  "email": ""},
-  {"name": "City Toyota (Daly City)",        "region": "SF",  "email": ""},
-  {"name": "Toyota of Berkeley",             "region": "SF",  "email": ""},
-  {"name": "Toyota Sunnyvale",               "region": "SF",  "email": ""},
-  {"name": "Stevens Creek Toyota (San Jose)","region": "SF",  "email": ""}
+  {
+    "name": "Toyota of Downtown LA",
+    "region": "LA",
+    "email": "BenGirmay@toyotadowntownla.edealerhub.com",
+    "confidence": "high"
+  },
+  {
+    "name": "Stevens Creek Toyota (San Jose)",
+    "region": "SF",
+    "email": "jwei@sctoyota.com",
+    "confidence": "med-high"
+  },
+  {
+    "name": "Toyota Sunnyvale",
+    "region": "SF",
+    "email": "toyotasunnyvale@digitalairstrike.com",
+    "confidence": "medium"
+  },
+  {
+    "name": "Longo Toyota (El Monte)",
+    "region": "LA",
+    "email": "sales@longotoyota.com",
+    "confidence": "low-med"
+  },
+  {
+    "name": "Toyota Santa Monica",
+    "region": "LA",
+    "email": "santiagogutierrez@toyotasantamonica.com",
+    "confidence": "low-med"
+  },
+  {
+    "name": "Toyota of Glendale",
+    "region": "LA",
+    "email": "sales@toyotaofglendale.com",
+    "confidence": "low"
+  },
+  {
+    "name": "City Toyota (Daly City)",
+    "region": "SF",
+    "email": "sales@citytoyota.com",
+    "confidence": "low"
+  },
+  {
+    "name": "Toyota of Berkeley",
+    "region": "SF",
+    "email": "sales@toyotaofberkeley.com",
+    "confidence": "low"
+  },
+  {
+    "name": "San Francisco Toyota",
+    "region": "SF",
+    "email": "internetsales@sftoyota.com",
+    "confidence": "low"
+  },
+  {
+    "name": "Toyota of Hollywood",
+    "region": "LA",
+    "email": "internetsales@hollywoodtoyota.com",
+    "confidence": "low"
+  }
 ]
