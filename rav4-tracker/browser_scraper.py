@@ -172,10 +172,9 @@ def _get_carmax_stock_urls(page):
 
 # Fuel types we consider "hybrid / EV" for post-fetch filtering.
 # CarMax LD+JSON reports: "Hybrid", "Electric", "Gas", "Diesel", "Flex".
-_HYBRID_FUELS = {"hybrid", "electric", "plug-in hybrid", "phev"}
-_HYBRID_TITLE_RE = re.compile(
-    r"\b(hybrid|phev|plug.?in|electric|ev\b)", re.I
-)
+# Hybrid = has a combustion engine + electric motor. Pure EVs (Tesla etc.) are excluded.
+_HYBRID_FUELS = {"hybrid", "plug-in hybrid", "phev"}
+_HYBRID_TITLE_RE = re.compile(r"\b(hybrid|phev|plug.?in)\b", re.I)
 
 
 def _is_hybrid(listing):
@@ -207,7 +206,6 @@ def scrape_carmax(zip_code="90012", radius=75, year_min=2022,
         f"?body_styles=suv_crossover"
         f"&fuel_types%5B%5D=hybrid"
         f"&fuel_types%5B%5D=plug_in_hybrid"
-        f"&fuel_types%5B%5D=electric"
         f"&year_min={year_min}"
         f"&list_price_min={price_min}"
         f"&list_price_max={price_max}"
@@ -293,7 +291,7 @@ def _carvana_url(year_min=2022, price_min=20000, price_max=40000,
     """
     payload = {
         "filters": {
-            "fuelTypes": ["Hybrid", "Plug-In Hybrid", "Electric"],
+            "fuelTypes": ["Hybrid", "Plug-In Hybrid"],
             "bodyTypes": ["SUV / Crossover"],
         }
     }

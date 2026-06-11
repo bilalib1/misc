@@ -117,10 +117,6 @@ LEATHER_TRIMS = {
     "crosstrek hybrid": {"hybrid", "limited"},             # leather-trimmed; base/Sport are cloth
     "wrangler 4xe": {"high altitude", "rubicon x", "sahara"},  # leather standard/optional; CONFIRM per listing — many are cloth
     "grand cherokee 4xe": {"limited", "overland", "summit", "trailhawk"},  # base 4xe is cloth
-    # Tesla: all trims ship with vegan leather (same category as SofTex/NuLuxe)
-    "model y": {"long range", "performance", "rear-wheel drive", "standard range", "awd"},
-    "model 3": {"long range", "performance", "rear-wheel drive", "standard range plus",
-                "standard range", "awd", ""},  # "" catches blank trim from CarMax
     # Corolla Cross Hybrid: XLE has SofTex; S/SE are fabric
     "corolla cross hybrid": {"xle"},
     # Mustang Mach-E: Premium, First Edition, GT; Select is cloth
