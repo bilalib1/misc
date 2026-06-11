@@ -7,13 +7,22 @@ Telegram. The listing *extraction* itself (reading each results page into
 structured rows) is done by a Claude agent / WebFetch step, because Cars.com
 renders results client-side — see the workflow notes in the plan doc.
 
+Availability: a listing is only "in stock" if its exact VIN is confirmed for
+sale on the SELLING DEALER'S OWN site (or, for online-only sellers like Carvana,
+on that seller's live page). Cars.com is NOT authoritative — it keeps sold cars
+live in both search results and the detail page (we shipped a sold car once
+because we trusted it). `send_ranked` refuses any listing lacking a `vin` and a
+truthy `verified` flag, so only dealer-confirmed cars can go out.
+
 Usage:
   python car_search.py urls                 # print the Cars.com URLs to fetch
   python car_search.py send shortlist.json  # send a ranked list to Telegram
 
-shortlist.json is a JSON array of objects, best value first:
+shortlist.json is a JSON array of objects, best value first. Every object MUST
+carry the VIN and a verified flag set once the dealer-site check passes:
   [{"title": "2022 Toyota RAV4 Hybrid XLE Premium", "price": "$27,995",
-    "miles": "33k mi", "city": "Glendale", "url": "https://www.cars.com/..."}]
+    "miles": "33k mi", "city": "Glendale", "url": "https://www.cars.com/...",
+    "vin": "JTM...1234", "verified": true}]
 """
 import html
 import json
@@ -132,8 +141,61 @@ def search_urls():
             yield build_search_url(make, model_slug, color)
 
 
-def send_ranked(listings, header=None):
-    """listings: iterable of dicts with title/price/miles/city/url, best first."""
+# Dealers/sellers whose sites hard-block automated VIN verification (Akamai 403),
+# so we can't prove a car is still in stock. Treat their listings as unverifiable
+# and drop them rather than risk texting a sold car. Carvana is the opposite —
+# online-only, so its live page IS the source of truth and is easy to confirm.
+UNVERIFIABLE_SELLERS = ("carmax",)
+
+# Substrings that mean a listing page is dead (sold / pulled / not found).
+SOLD_MARKERS = (
+    "no longer available", "this vehicle has been sold", "vehicle not found",
+    "no longer in our inventory", "is no longer available", "vehicle has been sold",
+)
+_BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+
+def check_listing_available(url, timeout=20):
+    """Best-effort probe of a listing URL: 'available' / 'gone' / 'unknown'.
+
+    A 404, a redirect off the detail page, or a sold-marker => 'gone'. Many
+    sites (Cars.com, CarMax/Akamai) answer non-browser clients with 403/429 —
+    then we can't tell, so 'unknown' (verify by VIN on the dealer's own site).
+    Even a reachable Cars.com 'available' is NOT proof; confirm by VIN.
+    """
+    try:
+        r = requests.get(url, headers={"User-Agent": _BROWSER_UA},
+                         timeout=timeout, allow_redirects=True)
+    except requests.RequestException:
+        return "unknown"
+    if r.status_code in (403, 429):
+        return "unknown"
+    if r.status_code == 404:
+        return "gone"
+    if "/vehicledetail/" in url and "/vehicledetail/" not in r.url:
+        return "gone"  # redirected away from the single-car page
+    if any(m in r.text.lower() for m in SOLD_MARKERS):
+        return "gone"
+    return "available" if r.ok else "unknown"
+
+
+def send_ranked(listings, header=None, require_verified=True):
+    """listings: iterable of dicts with title/price/miles/city/url, best first.
+
+    Each listing must also carry `vin` and a truthy `verified` (set only after
+    confirming the VIN is live on the selling dealer's OWN site). Refuses to send
+    otherwise — this is the guard that stops sold/unverified cars going out.
+    """
+    if require_verified:
+        bad = [d.get("title", "?") for d in listings
+               if not d.get("vin") or not d.get("verified")]
+        if bad:
+            raise SystemExit(
+                "Refusing to send unverified listings (missing vin/verified): "
+                + "; ".join(bad)
+                + "\nConfirm each VIN is in stock on the SELLING DEALER'S OWN site "
+                  "(Cars.com lags and shows sold cars), then set vin + verified.")
     tok, chat = telegram_conf()
     header = header or ("Top silver/grey hybrids near LA - leather, 2022+, "
                         "under 50k mi, $20-40k. Best value first:")
