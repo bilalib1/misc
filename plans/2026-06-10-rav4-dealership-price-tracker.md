@@ -209,10 +209,30 @@ All code under `~/code/misc/rav4-tracker/` unless noted.
 - `test_price.py` — 7 unit cases; run with `python test_price.py`.
 - `send.py` — blast (`--test=`, `--dry-run`, real).
 - `poll.py` — replies → price → ≥5 → Telegram → label.
+- `car_search.py` — silver-hybrid finder: builds Cars.com search URLs, encodes the silver-synonym + leather-trim rules, sends a ranked shortlist to Telegram (see §15b). *(committed)*
 - `dealers.json` — 10 dealership names; you fill emails. *(committed)*
 - `requirements.txt`, `.gitignore`.
 - `~/code/misc/.github/workflows/rav4-poll.yml` — cron poller (every 15 min).
 - `~/secrets/rav4-tracker/` — token.json, client_secret.json, telegram.json, message.json. *(never committed)*
+
+---
+
+## 15b. Car-search workflow (silver hybrid finder)
+
+A side task that reuses the Telegram channel: find the best used-car deals and text a ranked top-N. Helper: `car_search.py`. Buyer wants a RAV4-Hybrid-like car: **silver, leather seats, hybrid, LA area, 2022+, under 50k mi, $20k–$40k.**
+
+Procedure:
+1. **Build search URLs** — `python car_search.py urls`. One Cars.com filtered URL per (model, color). Models = RAV4 Hybrid + close relatives (Venza, CR-V Hybrid, Tucson/Santa Fe Hybrid, Sportage/Sorento Hybrid). Colors = `silver` **and** `gray` (many silver cars are filed under gray).
+2. **Extract listings** — fetch each URL with a Claude agent / WebFetch (Cars.com renders results client-side, so a plain `requests.get` won't see them). Each page yields ~20–50 rows: year/trim, price, mileage, color, dealer + city, and a `…/vehicledetail/<uuid>/` link.
+3. **Filter** —
+   - **Location:** greater LA / SoCal only; drop out-of-state and far (San Diego/Vegas/Fresno).
+   - **Silver synonyms pass:** silver *and* grey-family names count — Platinum Graphite, Steel Gray, Magnetic/Celestial/Silky/Lunar/Atomic/Shimmering Silver, Chrome, Stardust, Titanium, Cement (`car_search.is_silver`). Drop black/white/blue/red.
+   - **Leather only:** keep trims with leather or leather-like (SofTex/SynTex/NuLuxe); drop base cloth (RAV4 LE/XLE, CR-V Sport, Sorento S/LX). Map in `car_search.LEATHER_TRIMS` (`has_leather`).
+4. **Verify finalists** — open each shortlisted detail page to confirm it's still active and the price / mileage / leather are as listed (results pages don't show interior material). Never text an unverified listing.
+5. **Rank by value** — price weighed against year, mileage, trim. Best deal = #1.
+6. **Send** — `python car_search.py send shortlist.json` (or `send_ranked()`): one brief numbered line each, `view` hyperlinked to the listing, best first.
+
+First run (2026-06-10): texted a verified top 10 (RAV4 Hybrid XLE Premium / SE, Kia Sorento Hybrid EX / SX Prestige, Tucson Hybrid Limited, CR-V Hybrid Sport Touring), all silver/grey + leather, $27,995–$38,288, LA-area.
 
 ---
 
@@ -234,5 +254,6 @@ Not applicable yet.
 - **2026-06-10** — Plan drafted. Core open question is the persistent host (recommending GitHub Actions cron). No code yet.
 - **2026-06-10** — Built the whole system: `rav4-tracker/` scripts + price logic (7/7 tests) + GitHub Actions poller + one `setup.sh` that prompts for the 3 manual pieces (GCP OAuth client, Telegram bot, dealer emails). Secrets relocated to `~/secrets/rav4-tracker/` (none in repo) per request. All modules import clean in a venv. Not yet run end-to-end — waiting on you to run `setup.sh` and supply consent + bot token + emails.
 - **2026-06-10** — Went live, end-to-end. Gmail OAuth consent done; Telegram bot `@mac_2026_6382_bot` connected (chat_id captured). Added the conversational control plane (`bot.py`): owner texts the bot → headless Claude Code agent answers + can edit the service; wired into the cron, gated on `ANTHROPIC_API_KEY`. Set the 3 GitHub Actions secrets (`GMAIL_TOKEN_JSON`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). **Blasted the quote request to all 10 dealers** (ids recorded in `dealers.json`). Fixed the workflow (`secrets.*` isn't allowed in step-level `if` → surfaced `ANTHROPIC_API_KEY` as a job env var, gate on `env.*`). Triggered a run: poll step passed in 11s ("0 of 10 replied" — expected, blast just went out); bot steps correctly skipped (no API key set). Poller now runs every 15 min. **To activate the bot:** add an `ANTHROPIC_API_KEY` repo secret.
+- **2026-06-10** — Side task: used-car finder. Scraped Cars.com (RAV4 Hybrid + relatives) for silver/grey, leather, hybrid, LA-area, 2022+, <50k mi, $20–40k; verified each finalist's detail page; texted a value-ranked top 10 via the Telegram bot with per-listing image links. Captured the repeatable procedure in §15b and the `car_search.py` helper (encodes silver-synonym + leather-trim rules; builds search URLs; sends ranked shortlist). Buyer rule: silver synonyms (platinum graphite, steel gray, chrome, stardust, etc.) pass as "silver".
 - **2026-06-10** — Added subscription auth path: `bot.py` + workflow now accept `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) so the bot can run on a Claude Max plan instead of metered API billing. Two dealer addresses hard-bounced (`internetsales@sftoyota.com`, `sales@toyotaofglendale.com`); other 8 delivered. The one GitHub Action "failure" email was the single broken-workflow parse error (`secrets.*` in step `if`), already fixed — later runs are green. Open follow-ups moved to §16b.
 - **2026-06-10** — **Conversational bot activated.** Minted a ~1-year OAuth token (`claude setup-token`) and set it as the `CLAUDE_CODE_OAUTH_TOKEN` repo secret (via stdin, not shell history). Manual `workflow_dispatch` run (#27317363546) was fully green — `install Claude Code` + `bot` steps now execute (token authenticates in CI), and the bot processed a live owner message end-to-end (`Handled 1 owner message(s).` → reply delivered to Telegram). The first §16b follow-up is done; remaining open item is the two bounced dealer addresses.
