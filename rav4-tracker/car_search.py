@@ -8,11 +8,10 @@ structured rows) is done by a Claude agent / WebFetch step, because Cars.com
 renders results client-side — see the workflow notes in the plan doc.
 
 Availability: a listing is only "in stock" if its exact VIN is confirmed for
-sale on the SELLING DEALER'S OWN site (or, for online-only sellers like Carvana,
-on that seller's live page). Cars.com is NOT authoritative — it keeps sold cars
-live in both search results and the detail page (we shipped a sold car once
-because we trusted it). `send_ranked` refuses any listing lacking a `vin` and a
-truthy `verified` flag, so only dealer-confirmed cars can go out.
+sale on the SELLING DEALER'S OWN site. Cars.com is NOT authoritative — it keeps
+sold cars live in both search results and the detail page (we shipped a sold car
+once because we trusted it). `send_ranked` refuses any listing lacking a `vin`
+and a truthy `verified` flag, so only dealer-confirmed cars can go out.
 
 Usage:
   python car_search.py urls                 # print the Cars.com URLs to fetch
@@ -143,8 +142,7 @@ def search_urls():
 
 # Dealers/sellers whose sites hard-block automated VIN verification (Akamai 403),
 # so we can't prove a car is still in stock. Treat their listings as unverifiable
-# and drop them rather than risk texting a sold car. Carvana is the opposite —
-# online-only, so its live page IS the source of truth and is easy to confirm.
+# and drop them rather than risk texting a sold car.
 UNVERIFIABLE_SELLERS = ("carmax",)
 
 # Substrings that mean a listing page is dead (sold / pulled / not found).
