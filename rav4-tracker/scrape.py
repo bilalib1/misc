@@ -35,7 +35,7 @@ from car_search import (
     YEAR_MIN, PRICE_MIN, PRICE_MAX, MILES_MAX,
     is_silver, has_acceptable_interior, has_leather, confirms_leather,
     is_blocked_model, is_blocked_make,
-    MANUFACTURER_MULTIPLIER, trim_score_multiplier,
+    reliability_multiplier, get_brand_multiplier, trim_score_multiplier,
     search_urls,
     UNVERIFIABLE_SELLERS, SOLD_MARKERS,
 )
@@ -519,14 +519,15 @@ def _score(listing):
     Mile pts  : up to 100 pts; fewer miles = more pts
     Price pts : up to 10 pts; lower price within the bucket = more pts
 
-    Manufacturer multiplier: Toyota/Lexus 1.10×  …  Jeep 0.90×  (see MANUFACTURER_MULTIPLIER)
+    Reliability multiplier: brand reputation × per-car NHTSA complaints factor
+    (see car_search.reliability_multiplier) — precomputed once and stored on the
+    listing as "reliability_mult"; falls back to brand-only if absent.
     Trim multiplier        : base leather 0.95×  …  top trim 1.10×  (see TRIM_RANKS)
     """
     year  = _parse_year(listing.get("title", "")) or YEAR_MIN
     miles = listing.get("miles") or MILES_MAX
     price = listing.get("price") or PRICE_MAX
     model, trim = _parse_model_trim(listing.get("title", ""))
-    make  = _make(listing)
 
     year_pts  = (year - 2019) * 100
     mile_pts  = (MILES_MAX - miles) / 500
@@ -534,10 +535,19 @@ def _score(listing):
 
     base = year_pts + mile_pts + price_pts
 
-    mfr_mult  = MANUFACTURER_MULTIPLIER.get(make, 1.0)
+    rel_mult  = listing.get("reliability_mult")
+    if rel_mult is None:
+        rel_mult = get_brand_multiplier(_make(listing))
     trim_mult = trim_score_multiplier(model, trim) if model else 1.0
 
-    return base * mfr_mult * trim_mult
+    return base * rel_mult * trim_mult
+
+
+def _model_token(listing):
+    """Primary model word from the title (word after the make), for the NHTSA lookup.
+    e.g. '2022 Toyota RAV4 Hybrid XLE' -> 'RAV4'; '2024 MAZDA CX-90 PHEV' -> 'CX-90'."""
+    parts = listing.get("title", "").split()
+    return parts[2] if len(parts) > 2 else ""
 
 
 def _make(listing):
@@ -869,6 +879,14 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         verified.append(blst)
     print(f"[scrape] {len(verified)} total after merging CarMax+Carvana")
 
+    # Precompute the reliability multiplier (brand reputation × per-car NHTSA
+    # complaints factor) once per car — cached by make/model/year in car_search, so
+    # _score stays cheap during the many selection passes.
+    print("[scrape] computing reliability (brand + NHTSA complaints) …")
+    for l in verified:
+        l["reliability_mult"] = reliability_multiplier(
+            _make(l), _model_token(l), _parse_year(l.get("title", "")))
+
     # -- Step 6: 4 buckets = {strict non-black, relaxed black} x {$20-30k, $30-40k},
     # top 5 each by the scoring function. Unknown-interior cars count as non-black.
     strict  = [l for l in verified if has_acceptable_interior(l.get("interior", ""))]
@@ -922,6 +940,7 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         lines = [header]
         lines.append("$20–30k:")
         lines += ([_brief(l, i) for i, l in enumerate(under, 1)] or ["  —"])
+        lines.append("")            # blank line before the next price bucket (readability)
         lines.append("$30–40k:")
         lines += ([_brief(l, i) for i, l in enumerate(over, 1)] or ["  —"])
         return lines

@@ -23,6 +23,7 @@ carry the VIN and a verified flag set once the dealer-site check passes:
     "miles": "33k mi", "city": "Glendale", "url": "https://www.cars.com/...",
     "vin": "JTM...1234", "verified": true}]
 """
+import datetime
 import html
 import json
 import sys
@@ -230,22 +231,102 @@ def search_urls():
 # Reliability / quality scoring tables
 # ---------------------------------------------------------------------------
 
-# Manufacturer reliability multiplier.
-# Based on Consumer Reports predicted reliability + J.D. Power long-term data
-# for the specific hybrid platforms we search (2022-2026 model years).
+# Brand reputation multiplier (top reliability/resale = 1.0). Rescaled 2026-06-14 per
+# the buyer's guidance — Toyota/Lexus/Honda ~1.0, Mazda ~0.92, Jeep ~0.70 — and widened
+# to cover EVERY make the filter-first search can surface; unknown makes use the default.
 MANUFACTURER_MULTIPLIER = {
-    "toyota":      1.10,  # best hybrid reliability + resale; top CR scores
-    "lexus":       1.10,  # same platform as Toyota; highest JD Power rankings
-    "honda":       1.07,  # CR-V Hybrid consistently excellent; near-Toyota tier
-    "mazda":       1.05,  # CX-50 Hybrid strong debut; top predicted reliability
-    "subaru":      1.03,  # solid overall; AWD specialist; Crosstrek few issues
-    "hyundai":     1.00,  # baseline; improving fast but not Toyota-tier yet
-    "ford":        0.97,  # Escape Hybrid has had powertrain recalls; below avg
-    "nissan":      0.97,  # declining reliability trend across lineup
-    "mitsubishi":  0.94,  # thin dealer network; PHEV drivetrain OK but service costs
-    "volvo":       0.93,  # higher ownership / repair costs; below-avg reliability
-    "jeep":        0.90,  # 4xe consistently lowest JD Power scores in its segment
+    "toyota": 1.00, "lexus": 1.00, "honda": 1.00, "acura": 0.98,
+    "mazda": 0.92, "subaru": 0.90,
+    "hyundai": 0.88, "genesis": 0.88, "kia": 0.86, "buick": 0.86,
+    "ford": 0.84, "chevrolet": 0.84, "gmc": 0.84, "nissan": 0.84,
+    "infiniti": 0.84, "lincoln": 0.84, "cadillac": 0.82, "mitsubishi": 0.82,
+    "bmw": 0.80, "volvo": 0.80, "porsche": 0.80, "mini": 0.80, "volkswagen": 0.80,
+    "audi": 0.78, "mercedes-benz": 0.78,
+    "dodge": 0.74, "chrysler": 0.74, "ram": 0.74,
+    "jeep": 0.70, "jaguar": 0.70, "land": 0.68, "alfa": 0.68, "fiat": 0.66,
+    "maserati": 0.66,
 }
+MANUFACTURER_DEFAULT = 0.82   # unknown make
+
+
+def get_brand_multiplier(make: str) -> float:
+    return MANUFACTURER_MULTIPLIER.get((make or "").lower().strip(), MANUFACTURER_DEFAULT)
+
+
+# Approx US annual unit sales per model — used ONLY to normalize NHTSA complaint counts
+# by volume (a popular model has more complaints just from selling more). Rough figures
+# are fine for a relative nudge; models not listed use SALES_DEFAULT. Keyed by the
+# primary model word (lowercased), e.g. 'rav4', 'cr-v', 'cx-90', 'santa' (Santa Fe).
+MODEL_ANNUAL_SALES = {
+    "rav4": 430000, "cr-v": 360000, "tucson": 180000, "santa": 110000,
+    "cx-50": 45000, "cx-90": 55000, "cx-5": 150000, "cx-30": 60000,
+    "escape": 130000, "outlander": 90000, "crosstrek": 150000, "forester": 165000,
+    "nx": 60000, "ux": 25000, "rx": 110000, "venza": 35000,
+    "xc40": 25000, "xc60": 45000, "xc90": 35000, "q5": 65000, "q3": 30000,
+    "x5": 65000, "x3": 55000, "glc": 55000, "gle": 50000, "macan": 30000,
+    "hornet": 15000, "tonale": 8000, "highlander": 230000, "sequoia": 45000,
+    "sorento": 100000, "sportage": 130000, "telluride": 100000, "rogue": 250000,
+    "murano": 35000, "wrangler": 180000, "cherokee": 110000,
+}
+SALES_DEFAULT = 35000
+
+_CURRENT_YEAR = datetime.date.today().year
+_complaint_cache: dict = {}
+
+
+def _nhtsa_complaints(make: str, model: str, year):
+    """Live NHTSA complaint count for a make/model/year, cached. None on failure."""
+    if not (make and model and year):
+        return None
+    key = (make.lower(), model.lower(), int(year))
+    if key in _complaint_cache:
+        return _complaint_cache[key]
+    n = None
+    try:
+        r = requests.get(
+            "https://api.nhtsa.gov/complaints/complaintsByVehicle",
+            params={"make": make, "model": model, "modelYear": int(year)},
+            timeout=8,
+        )
+        if r.ok:
+            n = int(r.json().get("count") or 0)
+    except Exception:
+        n = None
+    _complaint_cache[key] = n
+    return n
+
+
+def reliability_multiplier(make: str, model: str, year, want_detail=False):
+    """Combined reliability = brand reputation × a per-car NHTSA factor.
+
+    The NHTSA factor blends three ideas, all SECONDARY to the brand multiplier:
+      • complaints / sales, normalized to complaints per 10k vehicle-years (so a
+        high-volume model isn't penalized just for selling more), vs a ~2.0 baseline.
+      • data CONFIDENCE w = exposure / 300k vehicle-years — a brand-new, low-volume
+        model has little data, so its statistically-weak complaint signal is damped.
+      • FIRST-GEN / unproven-platform risk: low-confidence (new + low-volume) cars take
+        a small penalty, so a 0-complaint first-year Mazda does NOT outscore a proven
+        Toyota; a same-year Toyota always edges a Mazda slightly.
+    """
+    brand = get_brand_multiplier(make)
+    n = _nhtsa_complaints(make, model, year)
+    sales = MODEL_ANNUAL_SALES.get((model or "").lower().strip(), SALES_DEFAULT)
+    years = max(1, _CURRENT_YEAR - int(year) + 1) if year else 1
+    exposure = sales * years                      # vehicle-years on the road
+    w = min(1.0, exposure / 300_000)              # data confidence
+    if n is None:
+        factor = 1.0                              # no NHTSA data → brand only
+    else:
+        rate = n / (exposure / 10_000)            # complaints per 10k vehicle-years
+        dev = max(-2.0, min(4.0, rate - 2.0))     # deviation from baseline
+        complaint_adj = -w * dev * 0.015          # good rate → +, bad rate → −
+        firstgen_risk = (1.0 - w) * 0.04          # new/low-volume → small penalty
+        factor = max(0.90, min(1.03, 1.0 + complaint_adj - firstgen_risk))
+    rel = brand * factor
+    if want_detail:
+        return rel, {"brand": brand, "complaints": n, "sales": sales, "years": years,
+                     "factor": round(factor, 3), "reliability": round(rel, 4)}
+    return rel
 
 # Trim hierarchy per model: rank 1 = base leather trim, higher = better equipped.
 # Normalized to a 0.95×–1.10× multiplier (15 pp spread) in trim_score_multiplier().
