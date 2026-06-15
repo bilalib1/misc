@@ -416,5 +416,9 @@ focus-steal on 2026-06-11.)
   qualifying car across all makes (Mazda CX-90 PHEV, Dodge Hornet, Audi Q5, Lexus UX…) instead of a
   curated 13-model list — this is what was hiding cars like the Ford Escape. Leather enforced via the
   feature tag (tradeoff vs the buyer's old trim-spec preference, required to span all makes). Local:
-  make blacklist (Jeep, Kia); scoring fn ranks everything → **top 10 strict + top 10 relaxed**. Cars.com
-  filter-first refactor is next (still model-by-model).
+  make blacklist (Jeep, Kia); scoring fn ranks everything → **top 10 strict + top 10 relaxed**.
+- **2026-06-14** — **Cars.com filter-first too.** Replaced the 13-model × 2-color `search_urls` with ONE
+  body=SUV + fuel=hybrid/PHEV query per color (no make/model). Build the card title from the
+  `data-vehicle-details` JSON (visible text lazy-loads → was dropping cars) and paginate until no new
+  listings. Leather-by-trim stays local (no working Cars.com server leather filter; LA-local set is
+  small). 211 raw → 22 leather candidates in ~22s, no Cloudflare timeouts. **Full pipeline 5:36 → 1:34.**
