@@ -654,6 +654,12 @@ def _ingest_browser_sources():
             if lr is None and not has_leather(model, trim):
                 continue
 
+        # Carvana's /cars/filters endpoint honors only the cvnaid blob, ignoring the
+        # year/price/mileage URL query — so re-enforce them locally (a 2019 Lexus UX
+        # and Mercedes GLC leaked through before this guard).
+        year = _parse_year(title)
+        if year and year < YEAR_MIN:
+            continue
         miles = int(c.get("miles") or 0)
         price = int(c.get("price") or 0)
         if price and not (PRICE_MIN <= price <= PRICE_MAX):
