@@ -545,7 +545,14 @@ def _make(listing):
     return parts[1].lower() if len(parts) > 1 else "unknown"
 
 
-def _select_incremental(listings, top_n=5, brand_penalty=0.12):
+def _model_id(listing):
+    """make + model name from the title (year-stripped) for the hard de-dup cap.
+    Works for unrecognized models too, e.g. '2024 Dodge Hornet GT' -> 'dodge hornet'."""
+    parts = listing.get("title", "").split()
+    return " ".join(parts[1:3]).lower() if len(parts) >= 3 else " ".join(parts[1:2]).lower()
+
+
+def _select_incremental(listings, top_n=5, brand_penalty=0.12, max_per_model=2):
     """Greedy selection with incremental brand + model diversity penalties.
 
     Each slot is filled by picking the highest *effective* score from the
@@ -561,19 +568,22 @@ def _select_incremental(listings, top_n=5, brand_penalty=0.12):
       Second Toyota RAV4:   −12% brand −12% model = −24%  → effective = raw × 0.76
       Third Toyota:         −24% brand + any model penalty
 
-    A great same-brand car still wins if it's proportionally better; the penalty
-    is a "nudge toward diversity", not a hard cap.
+    On top of the soft penalty there is a HARD cap of `max_per_model` per model
+    (title-based `_model_id`), so a bucket can't become 3+ identical cars.
     """
     selected = []
     remaining = list(listings)
     brand_counts: dict = {}
     model_counts: dict = {}
+    id_counts: dict = {}
 
     for _ in range(top_n):
         if not remaining:
             break
         best_car, best_eff = None, float("-inf")
         for car in remaining:
+            if id_counts.get(_model_id(car), 0) >= max_per_model:
+                continue   # hard cap: already have max_per_model of this exact model
             make          = _make(car)
             model, _trim  = _parse_model_trim(car.get("title", ""))
             n_brand       = brand_counts.get(make, 0)
@@ -591,6 +601,7 @@ def _select_incremental(listings, top_n=5, brand_penalty=0.12):
         brand_counts[make] = brand_counts.get(make, 0) + 1
         if model:
             model_counts[(make, model)] = model_counts.get((make, model), 0) + 1
+        id_counts[_model_id(best_car)] = id_counts.get(_model_id(best_car), 0) + 1
 
     return selected
 
