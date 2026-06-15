@@ -383,6 +383,15 @@ BLOCKED_MODELS = {
     "elantra hybrid",
 }
 
+# Makes excluded entirely (buyer preference). Applied after the filter-first
+# cross-make fetch, which surfaces every make. Jeep blacklisted 2026-06-14;
+# Kia excluded throughout the project.
+BLOCKED_MAKES = {"jeep", "kia"}
+
+
+def is_blocked_make(make: str) -> bool:
+    return (make or "").lower().strip() in BLOCKED_MAKES
+
 
 def is_blocked_model(model: str) -> bool:
     m = (model or "").lower().strip()

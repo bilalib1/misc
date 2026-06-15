@@ -615,42 +615,32 @@ def _ingest_browser_sources():
     out = []
     for c in cm + cv:
         color = c.get("color", "")
-        if not is_silver(color):
+        if not is_silver(color):   # catches dark grays Carvana's "Gray" filter includes
             continue
-        # Black interiors are KEPT here — scrape.py's Step 6 partitions them into the
-        # message's "relaxed interior" section rather than dropping them.
-        interior = c.get("interior", "")
 
-        # Re-parse model/trim from the listing title — the title is the most
-        # reliable source across all providers. Carvana's LD+JSON trim field is
-        # broken: the regex that extracts it returns "Hybrid" (the fuel-type word
-        # in the model name) instead of the actual trim level. Parsing from the
-        # full title string ("2024 Toyota RAV4 Hybrid XLE Premium") gives us the
-        # correct trim.
         title = c.get("title", "")
-        model_parsed, trim_parsed = _parse_model_trim(title)
-        model = model_parsed or c.get("model", "").lower()
-        trim  = trim_parsed.lower() if trim_parsed else c.get("trim", "").lower()
-
-        if _cs.is_blocked_model(model):
+        # Make = first word after the year in the title (else the source's make field).
+        parts = title.split()
+        make = (parts[1] if len(parts) > 1 else c.get("make", "")).lower()
+        if _cs.is_blocked_make(make):   # Jeep / Kia
             continue
 
         source = c.get("source", "")
 
-        # CarMax LD+JSON provides `interior_type` — use confirms_leather() first
-        # as it is ground truth from the listing itself.
-        interior_type = c.get("interior_type", "")
-        leather_result = confirms_leather(interior_type)
-        if leather_result is False:
-            continue   # explicit "Cloth Seats" — hard reject
-        if leather_result is None:
-            # No seat-material text: require a confirmed leather trim by spec.
-            # Applied uniformly to all sources — no model-level fallback.
-            # Listings with unidentifiable or cloth trims are skipped; it is
-            # better to miss a few cars than to send cloth interiors.
-            if not has_leather(model, trim):
+        # Carvana cross-make results are leather-verified SERVER-SIDE (cvnaFeatures),
+        # so we trust that and skip the local trim gate — this is what lets ALL makes
+        # through. CarMax has no such filter, so verify its leather from listing text.
+        if not c.get("leather_ok"):
+            model_parsed, trim_parsed = _parse_model_trim(title)
+            model = model_parsed or c.get("model", "").lower()
+            trim  = trim_parsed.lower() if trim_parsed else c.get("trim", "").lower()
+            if _cs.is_blocked_model(model):
                 continue
-        # leather_result is True → confirmed leather from listing text
+            lr = confirms_leather(c.get("interior_type", ""))
+            if lr is False:
+                continue   # explicit "Cloth Seats"
+            if lr is None and not has_leather(model, trim):
+                continue
 
         miles = int(c.get("miles") or 0)
         price = int(c.get("price") or 0)
@@ -659,7 +649,7 @@ def _ingest_browser_sources():
         if miles and miles > MILES_MAX:
             continue
         out.append({
-            "title": c["title"],
+            "title": title,
             "url": c["url"],
             "price": price,
             "price_text": f"${price:,}",
@@ -667,7 +657,7 @@ def _ingest_browser_sources():
             "dealer": source.title(),   # "Carmax" / "Carvana"
             "city": source.title(),
             "ext_color": color,
-            "interior": interior,
+            "interior": c.get("interior", ""),   # "" (non-black) or "Black", tagged at scrape time
             "vin": c.get("vin", ""),
             "verified": bool(c.get("vin") and c.get("url")),
             "source": source,
@@ -845,21 +835,17 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         verified.append(blst)
     print(f"[scrape] {len(verified)} total after merging CarMax+Carvana")
 
-    # -- Step 6: partition by interior, then select --
-    # Section 1 (strict) = the buyer's full filters incl. non-black interior.
-    # Section 2 (relaxed) = SAME filters but interior color relaxed → the extra cars
-    # that have a (known) BLACK interior. Unknown-interior cars count as non-black.
-    strict = [l for l in verified if has_acceptable_interior(l.get("interior", ""))]
-    relaxed_extra = [l for l in verified if not has_acceptable_interior(l.get("interior", ""))]
-
-    under30 = [l for l in strict if (l.get("price") or 0) <  30_000]
-    over30  = [l for l in strict if (l.get("price") or 0) >= 30_000]
-    top_under   = _select_incremental(under30, top_n=5)
-    top_over    = _select_incremental(over30,  top_n=5)
-    top_relaxed = _select_incremental(relaxed_extra, top_n=5)
-    top = top_under + top_over + top_relaxed
-    print(f"[scrape] strict: {len(top_under)} under / {len(top_over)} over $30k; "
-          f"relaxed-interior extra: {len(top_relaxed)}")
+    # -- Step 6: partition by interior, then rank each with the scoring function --
+    # Strict  = buyer's full filters incl. non-black interior (top 10).
+    # Relaxed = same filters but interior color relaxed → known-black interiors (top 10).
+    # Unknown-interior cars count as non-black (acceptable).
+    strict  = [l for l in verified if has_acceptable_interior(l.get("interior", ""))]
+    relaxed = [l for l in verified if not has_acceptable_interior(l.get("interior", ""))]
+    top_strict  = _select_incremental(strict,  top_n=10)
+    top_relaxed = _select_incremental(relaxed, top_n=10)
+    top = top_strict + top_relaxed
+    print(f"[scrape] strict {len(top_strict)} / relaxed {len(top_relaxed)} "
+          f"(pools {len(strict)}/{len(relaxed)})")
 
     # -- Structured log for autonomous spot-checking (images, diversity, anomalies) --
     def _slim(l):
@@ -873,9 +859,9 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         makes[_make(l)] = makes.get(_make(l), 0) + 1
     log = {
         "counts": {"verified": len(verified), "strict": len(strict),
-                   "relaxed_extra": len(relaxed_extra), "selected": len(top)},
+                   "relaxed": len(relaxed), "selected": len(top)},
         "make_distribution": makes,
-        "selected_strict": [_slim(l) for l in top_under + top_over],
+        "selected_strict": [_slim(l) for l in top_strict],
         "selected_relaxed": [_slim(l) for l in top_relaxed],
         "all_verified": [_slim(l) for l in verified],
     }
@@ -893,19 +879,13 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         return f'{i}. {title} — {price_str} | {miles_str}{color_part} — <a href="{lst["url"]}">view</a>'
 
     def _build_msg():
-        lines = ["<b>Silver/gray leather hybrids, 2021+, &lt;50k mi, $20–40k</b>",
-                 "<b>Your filters (non-black interior):</b>"]
-        if top_under:
-            lines.append("Under $30k:")
-            lines += [_brief(l, i) for i, l in enumerate(top_under, 1)]
-        if top_over:
-            lines.append("$30–40k:")
-            lines += [_brief(l, i) for i, l in enumerate(top_over, 1)]
-        if not (top_under or top_over):
-            lines.append("(no matches right now)")
+        lines = ["<b>Silver/gray leather hybrid/PHEV SUVs, 2021+, &lt;50k mi, $20–40k</b>", "",
+                 "<b>Strict — non-black interior (top 10):</b>"]
+        lines += ([_brief(l, i) for i, l in enumerate(top_strict, 1)]
+                  or ["(no matches right now)"])
         if top_relaxed:
             lines.append("")
-            lines.append("<b>Relaxing interior color (black interior also OK):</b>")
+            lines.append("<b>Relaxed — black interior also OK (top 10):</b>")
             lines += [_brief(l, i) for i, l in enumerate(top_relaxed, 1)]
         return "\n".join(lines)
 
@@ -932,7 +912,7 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         )
         r.raise_for_status()
         print(f"[scrape] sent {len(top)} listings to Telegram "
-              f"({len(top_under)+len(top_over)} strict + {len(top_relaxed)} relaxed)")
+              f"({len(top_strict)} strict + {len(top_relaxed)} relaxed)")
 
 
 def main():

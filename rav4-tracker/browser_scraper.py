@@ -67,18 +67,7 @@ _HYBRID_TITLE_RE = re.compile(
 # Safety cap on Carvana pagination: each results page holds ~21 listings, so
 # 40 pages covers ~840 listings — far beyond any single model's inventory in our
 # price/year/mileage window. Stops a runaway if the "no new VINs" exit ever fails.
-CARVANA_MAX_PAGES = 40
-# Concurrent Carvana workers: the model list is split across this many headless
-# browsers that paginate in parallel, then results are merged + VIN-deduped.
-CARVANA_WORKERS = 4
-
-# Carvana URL slugs that differ from the Cars.com model slug convention.
-CARVANA_SLUG_OVERRIDES = {
-    "lexus-nx-350h":       "lexus-nx",
-    "lexus-ux-250h":       "lexus-ux",
-    "mazda-cx-50-hybrid":  "mazda-cx-50",
-    "volvo-xc60-recharge": "volvo-xc60",
-}
+CARVANA_MAX_PAGES = 40   # safety cap; the cross-make queries page until no new VINs
 
 
 def _carvana_trim_from_text(name: str, desc: str) -> str:
@@ -125,48 +114,35 @@ def _carvana_is_hybrid(name, desc):
     return bool(_HYBRID_TITLE_RE.search(blob))
 
 
-def _carvana_model_slug(cars_com_slug):
-    """Convert a Cars.com model slug to a Carvana path segment, with overrides."""
-    base = cars_com_slug.replace("_", "-")
-    return CARVANA_SLUG_OVERRIDES.get(base, base)
-
-
-# Carvana's filter taxonomy: model_slug -> (Make, parentModel). parentModel is the
-# BASE name — Carvana treats fuel variants as trims, not separate models ("RAV4",
-# not "RAV4 Hybrid"). Used to build the cvnaid exterior-color filter so each model
-# query comes back pre-filtered to Silver/Gray (e.g. Jeep Wrangler 1481 -> 365)
-# instead of walking the whole catalog. Verified live 2026-06-14.
-CARVANA_MODEL_NAMES = {
-    "toyota-rav4_hybrid":       ("Toyota", "RAV4"),
-    "toyota-venza":             ("Toyota", "Venza"),
-    "honda-cr_v_hybrid":        ("Honda", "CR-V"),
-    "hyundai-tucson_hybrid":    ("Hyundai", "Tucson"),
-    "hyundai-santa_fe_hybrid":  ("Hyundai", "Santa Fe"),
-    "mazda-cx_50_hybrid":       ("Mazda", "CX-50"),
-    "ford-escape":              ("Ford", "Escape"),
-    "lexus-nx_350h":            ("Lexus", "NX"),
-    "lexus-ux_250h":            ("Lexus", "UX"),
-    "volvo-xc40":               ("Volvo", "XC40"),
-    "volvo-xc60_recharge":      ("Volvo", "XC60"),
-    "mitsubishi-outlander_phev": ("Mitsubishi", "Outlander"),
-    "subaru-crosstrek_hybrid":  ("Subaru", "Crosstrek"),
-    # Jeep 4xe blacklisted 2026-06-14 (also removed from car_search.MODELS).
+# Carvana filter values (from the UI's filter accordions, verified live 2026-06-14).
+# FILTER-FIRST: we filter SERVER-SIDE on body type + fuel + exterior + interior color
+# and do NOT name a make/model — one query returns every qualifying car across ALL
+# makes. Leather-by-trim + model recognition happen locally afterward (in scrape.py).
+CARVANA_BODY = ["suv"]                          # SUV / Crossover
+CARVANA_FUEL = ["Hybrid", "Plug-In Hybrid"]     # note the capital "I" in Plug-In
+CARVANA_COLORS = ["Silver", "Gray"]             # buyer's exterior-color filter
+# Two disjoint interior buckets so we KNOW each car's interior without a detail page
+# (listing LD+JSON omits it): nonblack -> strict section, black -> relaxed section.
+CARVANA_INTERIOR = {
+    "nonblack": ["Beige", "Brown", "Gray", "White", "Unspecified"],
+    "black":    ["Black"],
 }
-CARVANA_COLORS = ["Silver", "Gray"]   # buyer's exterior-color filter
+# Leather enforced server-side (the buyer wants leather/leather-like across ALL makes,
+# and we no longer have per-model trim data). The two feature values are AND-combined
+# by Carvana, so we query them SEPARATELY and union. "Synthetic Leather Seats" covers
+# SofTex/NuLuxe (e.g. RAV4 XLE Premium, Lexus); "Genuine Leather Seats" is real leather.
+CARVANA_LEATHER = ["Genuine Leather Seats", "Synthetic Leather Seats"]
 
 
-def _carvana_filter_url(model_slug, year_min, price_min, price_max, miles_max):
-    """Build a Carvana /cars/filters URL with a cvnaid blob that filters by
-    make+parentModel+exterior-color, or None if the model isn't in the taxonomy
-    (caller falls back to the plain per-model slug URL)."""
-    mk = CARVANA_MODEL_NAMES.get(model_slug)
-    if not mk:
-        return None
-    make, parent = mk
-    blob = {"filters": {"makes": [{"name": make, "parentModels": [{"name": parent}]}],
-                        "colors": CARVANA_COLORS}}
+def _carvana_crossmake_url(interior, leather, year_min, price_min, price_max, miles_max):
+    """Build a NO-MAKE Carvana /cars/filters URL (cvnaid blob) filtering by body type
+    + fuel + exterior color + interior bucket + ONE leather feature. Returns every
+    matching car across all makes; blacklist/ranking happen locally afterward."""
+    filters = {"bodyStyles": CARVANA_BODY, "fuelTypes": CARVANA_FUEL,
+               "colors": CARVANA_COLORS, "interiorColors": CARVANA_INTERIOR[interior],
+               "cvnaFeatures": [leather]}
     cvnaid = base64.urlsafe_b64encode(
-        json.dumps(blob, separators=(",", ":")).encode()).decode().rstrip("=")
+        json.dumps({"filters": filters}, separators=(",", ":")).encode()).decode().rstrip("=")
     return ("https://www.carvana.com/cars/filters"
             f"?year={year_min}-2026&price={price_min}-{price_max}&mileage=0-{miles_max}"
             f"&cvnaid={cvnaid}")
@@ -483,42 +459,34 @@ async def _scrape_carvana_model(tab, slug, base_url, only_hybrid, wait_secs, fir
 
 async def _scrape_carvana_async(zip_code, year_min, price_min, price_max,
                                 miles_max, only_hybrid, wait_secs):
-    """Scrape Carvana across all MODELS using CARVANA_WORKERS concurrent TABS in ONE
-    headless browser. Tabs share the browser's cookie jar, so once any tab clears
-    Cloudflare the cf_clearance cookie covers the rest (fewer challenges). Each tab
-    paginates its slice of the model list; results are merged + VIN-deduped."""
-    from car_search import MODELS
+    """FILTER-FIRST Carvana scrape: TWO no-make cross-make queries — non-black and
+    black interior — each filtered server-side to Silver/Gray Hybrid/PHEV SUVs, then
+    paginated. Returns every qualifying car across ALL makes (model/leather selection
+    is done locally by scrape.py). The interior tag drives strict vs relaxed sections.
+    Leather is enforced server-side; server already fuel-filtered, so the client
+    hybrid check is off (only_hybrid=False)."""
+    # 4 queries = {non-black, black} interior x {genuine, synthetic} leather.
+    queries = [(interior, tag, leather)
+               for interior, tag in (("nonblack", ""), ("black", "Black"))
+               for leather in CARVANA_LEATHER]
 
-    def _meta(model_slug):
-        slug = _carvana_model_slug(model_slug)
-        # Prefer the cvnaid color-filtered /cars/filters URL (small result set);
-        # fall back to the plain per-model slug URL if the model isn't mapped.
-        url = _carvana_filter_url(model_slug, year_min, price_min, price_max, miles_max)
-        if not url:
-            url = (f"https://www.carvana.com/cars/{slug}"
-                   f"?year={year_min}-2026&price={price_min}-{price_max}&mileage=0-{miles_max}")
-        return slug, url
-
-    chunks = [MODELS[i::CARVANA_WORKERS] for i in range(CARVANA_WORKERS)]
-
-    async def _worker(tab, model_chunk):
-        out = []
-        for idx, (_make, model_slug) in enumerate(model_chunk):
-            slug, base_url = _meta(model_slug)
-            try:
-                out += await _scrape_carvana_model(
-                    tab, slug, base_url, only_hybrid, wait_secs, first=(idx == 0))
-            except Exception as e:
-                print(f"[carvana/{slug}] worker error: {type(e).__name__}: {e}")
-        return out
+    async def _run(tab, interior, tag, leather, first):
+        url = _carvana_crossmake_url(interior, leather, year_min, price_min, price_max, miles_max)
+        label = f"{interior}/{leather.split()[0].lower()}"
+        cars = await _scrape_carvana_model(
+            tab, label, url, only_hybrid=False, wait_secs=wait_secs, first=first)
+        for c in cars:
+            c["interior"] = tag
+            c["leather_ok"] = True   # server-verified leather/leather-like
+        return cars
 
     browser = await _start_browser()
     try:
-        # One tab per worker (first reuses the browser's initial tab; rest are new tabs).
-        tabs = [await browser.get("about:blank", new_tab=(i > 0))
-                for i in range(CARVANA_WORKERS)]
+        # One tab per query (share the cookie jar), all four running concurrently.
+        tabs = [await browser.get("about:blank", new_tab=(i > 0)) for i in range(len(queries))]
         worker_out = await asyncio.gather(
-            *[_worker(tabs[i], chunks[i]) for i in range(CARVANA_WORKERS) if chunks[i]])
+            *[_run(tabs[i], qi, tg, le, first=(i == 0))
+              for i, (qi, tg, le) in enumerate(queries)])
     finally:
         await browser.stop()
 
