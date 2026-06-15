@@ -44,6 +44,7 @@ class ChromeCDPSession:
         self._url = websocket_debugger_url
         self._ws = websocket.create_connection(websocket_debugger_url, timeout=30)
         self._next_id = 0
+        self._event_buffer: list[dict] = []  # events seen while awaiting a call result
 
     @classmethod
     def for_url(cls, url_substring: str, port: int = DEFAULT_PORT) -> "ChromeCDPSession":
@@ -81,10 +82,19 @@ class ChromeCDPSession:
                 if "error" in data:
                     raise RuntimeError(f"{method} failed: {data['error']}")
                 return data.get("result", {})
+            if "method" in data:  # an event arrived while awaiting our result -- keep it
+                self._event_buffer.append(data)
         raise TimeoutError(f"{method} timed out")
 
     def wait_for_event(self, method: str, timeout: float = 15.0) -> dict:
-        """Block until a CDP event of the given method arrives; return its params."""
+        """Block until a CDP event of the given method arrives; return its params.
+
+        Checks events already buffered (e.g. ones that arrived during a prior call)
+        before reading new ones, so fast events are never missed.
+        """
+        for i, data in enumerate(self._event_buffer):
+            if data.get("method") == method:
+                return self._event_buffer.pop(i).get("params", {})
         deadline = time.time() + timeout
         while time.time() < deadline:
             self._ws.settimeout(max(0.1, deadline - time.time()))
@@ -94,6 +104,8 @@ class ChromeCDPSession:
                 break
             if data.get("method") == method:
                 return data.get("params", {})
+            if "method" in data:
+                self._event_buffer.append(data)
         raise TimeoutError(f"event {method} not seen within {timeout}s")
 
     def close(self) -> None:
