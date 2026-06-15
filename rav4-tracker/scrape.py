@@ -1,22 +1,23 @@
-"""Silver hybrid shortlist — Cars.com + CarMax + Carvana combined.
+"""Silver/gray leather hybrid-SUV shortlist — Cars.com + Carvana (+ CarMax) combined.
 
-Sources:
-  • Cars.com  — all models in car_search.MODELS (Toyota, Honda, Mitsubishi,
-                Lexus, Ford, Hyundai, Mazda, Jeep …) filtered by silver/gray
-                color bucket at the URL level; VIN-verified on dealer site.
-  • CarMax    — nationwide hybrid/PHEV SUVs via Playwright stealth (Akamai
-                bypass); LD+JSON gives full color/interior/trim in one pass.
-  • Carvana   — nationwide hybrid/PHEV SUVs via Playwright stealth (Cloudflare
-                bypass); same LD+JSON extraction.
+FILTER-FIRST across all makes (no per-model loop):
+  • Cars.com — one body=SUV + fuel=hybrid/PHEV + color query per color (greater LA);
+               leather-by-trim applied locally. Driven via the invisible :9334
+               real-Chrome CDP engine (Cars.com Cloudflare blocks everything else).
+  • Carvana  — NO-MAKE cvnaid queries (body+fuel+color+interior+leather) via zendriver
+               headless. 4 queries = {non-black,black} interior × {genuine,synthetic}
+               leather. Surfaces every qualifying car across all makes.
+  • CarMax   — zendriver headless; only exposes a static carousel, contributes little.
 
-All sources are filtered by the same car_search rules (color, interior,
-leather-by-trim) and ranked by value score. Top 10 sent to Telegram as
-a numbered bare-bones list: make/model/trim, price, miles, link.
+Blacklist (Jeep, Kia) + the value/reliability scoring fn rank everything into
+FOUR buckets — {strict non-black, relaxed black} × {$20–30k, $30–40k}, top 5 each,
+≤1 per model per bucket — sent to Telegram. Everything runs fully headless (no window).
 
 Usage:
   python scrape.py                # full run → send to Telegram
-  python scrape.py --dry-run      # fetch + filter + verify, print only
-  python scrape.py --out FILE     # write verified JSON to FILE, don't send
+  python scrape.py --dry-run      # fetch + filter + rank, print only
+  python scrape.py --out FILE     # write the selection to FILE, don't send
+  python scrape.py --no-browser   # Cars.com only (skip Carvana/CarMax)
 """
 import asyncio
 import json
