@@ -552,7 +552,7 @@ def _model_id(listing):
     return " ".join(parts[1:3]).lower() if len(parts) >= 3 else " ".join(parts[1:2]).lower()
 
 
-def _select_incremental(listings, top_n=5, brand_penalty=0.12, max_per_model=2):
+def _select_incremental(listings, top_n=5, brand_penalty=0.12, max_per_model=1):
     """Greedy selection with incremental brand + model diversity penalties.
 
     Each slot is filled by picking the highest *effective* score from the
