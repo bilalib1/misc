@@ -1,8 +1,0 @@
-.venv/
-__pycache__/
-# Secrets must never be committed. Real ones live in ~/secrets/rav4-tracker/.
-# These patterns are a backstop against accidental local copies.
-token.json
-client_secret*.json
-telegram.json
-message.json
