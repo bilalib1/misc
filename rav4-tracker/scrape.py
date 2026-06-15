@@ -851,17 +851,23 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         verified.append(blst)
     print(f"[scrape] {len(verified)} total after merging CarMax+Carvana")
 
-    # -- Step 6: partition by interior, then rank each with the scoring function --
-    # Strict  = buyer's full filters incl. non-black interior (top 10).
-    # Relaxed = same filters but interior color relaxed → known-black interiors (top 10).
-    # Unknown-interior cars count as non-black (acceptable).
+    # -- Step 6: 4 buckets = {strict non-black, relaxed black} x {$20-30k, $30-40k},
+    # top 5 each by the scoring function. Unknown-interior cars count as non-black.
     strict  = [l for l in verified if has_acceptable_interior(l.get("interior", ""))]
     relaxed = [l for l in verified if not has_acceptable_interior(l.get("interior", ""))]
-    top_strict  = _select_incremental(strict,  top_n=10)
-    top_relaxed = _select_incremental(relaxed, top_n=10)
+
+    def _price_buckets(pool):
+        under = [l for l in pool if (l.get("price") or 0) < 30_000]
+        over  = [l for l in pool if (l.get("price") or 0) >= 30_000]
+        return _select_incremental(under, top_n=5), _select_incremental(over, top_n=5)
+
+    strict_under, strict_over   = _price_buckets(strict)
+    relaxed_under, relaxed_over = _price_buckets(relaxed)
+    top_strict  = strict_under + strict_over
+    top_relaxed = relaxed_under + relaxed_over
     top = top_strict + top_relaxed
-    print(f"[scrape] strict {len(top_strict)} / relaxed {len(top_relaxed)} "
-          f"(pools {len(strict)}/{len(relaxed)})")
+    print(f"[scrape] strict {len(strict_under)}+{len(strict_over)} / "
+          f"relaxed {len(relaxed_under)}+{len(relaxed_over)} (pools {len(strict)}/{len(relaxed)})")
 
     # -- Structured log for autonomous spot-checking (images, diversity, anomalies) --
     def _slim(l):
@@ -894,15 +900,19 @@ async def run(dry_run=False, out_file=None, no_browser=False):
         title = lst["title"].replace("Used ", "").replace("Certified ", "")
         return f'{i}. {title} — {price_str} | {miles_str}{color_part} — <a href="{lst["url"]}">view</a>'
 
+    def _section(header, under, over):
+        lines = [header]
+        lines.append("$20–30k:")
+        lines += ([_brief(l, i) for i, l in enumerate(under, 1)] or ["  —"])
+        lines.append("$30–40k:")
+        lines += ([_brief(l, i) for i, l in enumerate(over, 1)] or ["  —"])
+        return lines
+
     def _build_msg():
-        lines = ["<b>Silver/gray leather hybrid/PHEV SUVs, 2021+, &lt;50k mi, $20–40k</b>", "",
-                 "<b>Strict — non-black interior (top 10):</b>"]
-        lines += ([_brief(l, i) for i, l in enumerate(top_strict, 1)]
-                  or ["(no matches right now)"])
-        if top_relaxed:
-            lines.append("")
-            lines.append("<b>Relaxed — black interior also OK (top 10):</b>")
-            lines += [_brief(l, i) for i, l in enumerate(top_relaxed, 1)]
+        lines = ["<b>Silver/gray leather hybrid/PHEV SUVs, 2021+, &lt;50k mi</b>", ""]
+        lines += _section("<b>Strict — non-black interior:</b>", strict_under, strict_over)
+        lines.append("")
+        lines += _section("<b>Relaxed — black interior also OK:</b>", relaxed_under, relaxed_over)
         return "\n".join(lines)
 
     if out_file:
