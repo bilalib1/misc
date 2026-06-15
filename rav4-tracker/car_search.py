@@ -50,23 +50,28 @@ MODELS = [
     ("hyundai", "hyundai-tucson_hybrid"),
     ("hyundai", "hyundai-santa_fe_hybrid"),
     ("mazda", "mazda-cx_50_hybrid"),
-    ("ford", "ford-escape_hybrid"),
-    ("ford", "ford-escape_plug_in_hybrid"),
+    ("ford", "ford-escape"),   # base slug: Cars.com has no ford-escape_hybrid slug; the
+                               # fuel_slugs=hybrid|plug_in_hybrid filter restricts it (Carvana
+                               # base slug is hybrid-keyword-filtered via _carvana_trust_slug=False)
     ("lexus", "lexus-nx_350h"),
     ("lexus", "lexus-ux_250h"),
     ("volvo", "volvo-xc40"),
     ("volvo", "volvo-xc60_recharge"),
     ("mitsubishi", "mitsubishi-outlander_phev"),
     ("subaru", "subaru-crosstrek_hybrid"),
-    ("jeep", "jeep-wrangler_4xe"),
-    ("jeep", "jeep-grand_cherokee_4xe"),
-    ("nissan", "nissan-murano"),       # Murano Hybrid; discontinued after 2020 — results likely sparse
-    ("nissan", "nissan-rogue"),        # no full hybrid in US market; included for completeness
+    # Jeep Wrangler/Grand Cherokee 4xe BLACKLISTED 2026-06-14 (buyer request): low
+    # reliability + the parentModel color filter still returns 300+ gas Wranglers to
+    # walk for a handful of 4xe. Re-add the two lines below to restore them.
+    #   ("jeep", "jeep-wrangler_4xe"),
+    #   ("jeep", "jeep-grand_cherokee_4xe"),
+    # Nissan Rogue/Murano removed 2026-06-14: no US hybrid variant, so they only
+    # ever returned gas cars (0 kept) while wasting a full paginated scrape each.
 ]
-# Note: Ford Escape / Volvo XC60 Recharge PHEVs aren't reachable by a dedicated
-# model slug on Cars.com — they live under the base model slug (ford-escape,
-# volvo-xc60) behind a `fuel_slugs[]=hybrid|plug_in_hybrid` filter this builder
-# doesn't add, so those URLs come back empty. Query them by hand if needed.
+# Note: Cars.com has no dedicated hybrid slug for these — they live under the BASE
+# model slug (ford-escape, volvo-xc60). build_search_url DOES add
+# fuel_slugs[]=hybrid|plug_in_hybrid, so the base slug returns only the hybrids/PHEVs.
+# Ford Escape now uses the base slug above; Volvo XC60 Recharge still uses
+# volvo-xc60_recharge (switch to base volvo-xc60 if it comes back empty).
 
 # Query both color buckets; many "silver" cars are filed under gray. The buyer
 # treats silver synonyms (platinum graphite, steel gray, chrome, stardust, etc.)
@@ -79,12 +84,18 @@ COLOR_SLUGS = ["silver", "gray"]
 SILVER_ROOTS = (
     "silver", "gray", "grey", "chrome", "platinum",
     "stardust", "sterling",
+    "ingot",      # Mazda "Ingot" / "Ingot Silver" (card JSON sometimes truncates to "Ingot")
 )
+# NOTE: "titanium" was REMOVED from the allowlist on 2026-06-14 — image spot-check
+# caught a Toyota "Titanium Glow" Venza that is actually champagne/GOLD passing as
+# silver. Genuine gray-titanium colors (e.g. "Titanium Gray") still pass via "gray".
 # Strings that veto a color regardless of root-word matches — dark/blue-leaning.
 DARK_COLOR_MARKERS = (
     "graphite", "magnetic", "gunmetal", "charcoal", "granite", "cement",
     "meteorite", "machine gray", "machine grey", "polymetal",
     "urban gray", "urban grey", "mercury", "dark gray", "dark grey",
+    "coastal",   # Toyota "Coastal Gray" is a dark blue-gray (confirmed by image 2026-06-12)
+    "carbonized",   # Ford "Carbonized Gray" is a dark gunmetal (2026-06-14)
 )
 # Vivid/dark colors that should never pass even if they contain no dark marker.
 _BLOCKED_COLORS = {"black", "blue", "red", "green", "orange", "yellow",
@@ -109,8 +120,8 @@ LEATHER_TRIMS = {
     "santa fe hybrid": {"limited", "calligraphy"},
     "elantra hybrid": {"limited"},                    # Limited only; Blue/SE are cloth
     "cx-50 hybrid": {"premium", "premium plus"},          # both CX-50 Hybrid trims are leather
-    "escape hybrid": {"titanium"},                         # ActiveX on lower trims is cloth-ish; Titanium = leather
-    "escape plug-in hybrid": {"titanium"},
+    "escape hybrid": {"titanium", "platinum"},             # Titanium (2020-22) + Platinum (2023+) = leather; ActiveX/cloth on lower trims
+    "escape plug-in hybrid": {"titanium", "platinum"},     # same: Titanium (<=2022) / Platinum (2023+)
     "nx 350h": {"base", "premium", "luxury", "f sport", "f sport handling"},  # NuLuxe standard across NX 350h
     "ux 250h": {"base", "premium", "luxury", "f sport"},  # NuLuxe standard across UX 250h
     "xc40": {"inscription", "r-design", "ultimate", "plus"},  # leather/leather-like; Momentum base is City Weave cloth
@@ -267,10 +278,12 @@ TRIM_RANKS = {
         "premium plus": 2,   # adds Bose + larger sunroof + ventilated seats
     },
     "escape hybrid": {
-        "titanium": 1,   # only leather trim; ActiveX synthetic
+        "titanium": 1,   # leather (2020-22 top trim)
+        "platinum": 2,   # leather (2023+ top trim); adds B&O audio, 360 cam
     },
     "escape plug-in hybrid": {
         "titanium": 1,
+        "platinum": 2,
     },
     "nx 350h": {
         "base":              1,   # NuLuxe standard across all NX 350h

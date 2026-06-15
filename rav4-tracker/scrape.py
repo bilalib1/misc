@@ -20,8 +20,11 @@ Usage:
 """
 import asyncio
 import json
+import os
 import re
+import subprocess
 import sys
+import time as _t
 
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth as _Stealth
@@ -35,10 +38,7 @@ from car_search import (
     search_urls,
     UNVERIFIABLE_SELLERS, SOLD_MARKERS,
 )
-from browser_scraper import (
-    scrape_carmax, scrape_carvana,
-    _hide_chromium,
-)
+from browser_scraper import scrape_carmax, scrape_carvana
 
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -48,9 +48,55 @@ TOP_N = 10
 MIN_MAKES = 4
 # Hard deadline for the entire Cars.com phase (seconds). If we hit it, we use
 # whatever we have plus the CarMax/Carvana results.
-CARS_COM_DEADLINE_SECS = 360   # 6 min ceiling for the whole Cars.com phase
-MAX_SEARCH_URLS = 24           # fetch more URLs before hitting the ceiling
+CARS_COM_DEADLINE_SECS = 600   # 10 min ceiling (interior detail-fetch added time)
+MAX_SEARCH_URLS = 40           # cover ALL models×colors (incl. Outlander PHEV — buyer's front-runner)
 NAV_TIMEOUT_MS = 30_000        # 30 s per page (was 20 s; Ford/Santa Fe were timing out)
+CARS_COM_CONCURRENCY = 4       # parallel Cars.com worker pages (search + detail fetches)
+
+
+# ---------------------------------------------------------------------------
+# Invisible CDP engine for Cars.com
+# ---------------------------------------------------------------------------
+
+def _ensure_cdp_engine(cdp_url):
+    """Start the invisible --headless=new CDP engine if it isn't already up.
+
+    Cars.com's Cloudflare hard-blocks Playwright's own Chromium AND a fresh-profile
+    headless Chrome (both get "Just a moment" / "Access denied"). Only a REAL Chrome
+    with the user's copied cookies — driven over CDP — passes. The launcher runs it
+    `--headless=new`, so NO window ever appears. Best-effort: on failure we fall back
+    to whatever `connect_over_cdp` / headless-launch can do.
+    """
+    import urllib.request
+    m = re.search(r":(\d+)", cdp_url or "")
+    port = m.group(1) if m else "9334"
+    ping = f"http://localhost:{port}/json/version"
+    try:
+        urllib.request.urlopen(ping, timeout=1)
+        return True   # already running
+    except Exception:
+        pass
+    script = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "..", "src", "browser_interaction",
+        "launch_chrome_with_cdp.sh"))
+    if not os.path.exists(script):
+        print(f"[scrape] CDP launcher not found at {script}; Cars.com may be blocked")
+        return False
+    print(f"[scrape] starting invisible headless CDP engine on :{port} …")
+    try:
+        subprocess.run(["bash", script, port], timeout=90,
+                       capture_output=True, text=True)
+    except Exception as e:
+        print(f"[scrape] engine launch error: {type(e).__name__}: {e}")
+    for _ in range(20):
+        try:
+            urllib.request.urlopen(ping, timeout=1)
+            print(f"[scrape] CDP engine up on :{port}")
+            return True
+        except Exception:
+            _t.sleep(0.5)
+    print(f"[scrape] CDP engine did not come up on :{port}; falling back")
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +121,17 @@ def _parse_year(title):
 def _parse_model_trim(title):
     """Return (model_key, trim_string) from a listing title."""
     t = title.lower()
+    # Ford Escape: the fuel word may sit mid-title, be "PHEV", or be absent
+    # ("Escape SE Hybrid", "Escape Titanium Plug-In Hybrid", "Escape PHEV",
+    # "Escape Titanium"). Cars.com's fuel filter already guarantees every result
+    # is a hybrid/PHEV, so treat ANY Escape as such; the trim (Titanium/Platinum =
+    # leather) is whatever's left after stripping the fuel designators.
+    if "escape" in t:
+        is_phev = bool(re.search(r"plug-?in\s+hybrid|phev", t))
+        model = "escape plug-in hybrid" if is_phev else "escape hybrid"
+        after = t.split("escape", 1)[1]
+        trim = re.sub(r"\b(plug-?in\s+hybrid|hybrid|phev)\b", "", after).strip()
+        return model, trim
     model_keys = [
         "grand cherokee 4xe", "wrangler 4xe",
         "outlander phev", "xc60 recharge",
@@ -105,12 +162,23 @@ async def _fetch_search_page(page, url):
 
     while True:
         paged_url = url if page_num == 1 else f"{url}&page={page_num}"
-        try:
-            await page.goto(paged_url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
-            await page.wait_for_selector("[data-listing-id]", timeout=20_000)
-        except Exception as e:
-            if page_num == 1:
-                print(f"    (skip: {type(e).__name__})")
+        # Retry the FIRST page a few times: under concurrency Cloudflare/the engine
+        # occasionally times out a load, and silently dropping the whole URL was the
+        # Cars.com "regression". A later-page timeout just means no more results.
+        loaded = False
+        max_tries = 3 if page_num == 1 else 1
+        for attempt in range(1, max_tries + 1):
+            try:
+                await page.goto(paged_url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+                await page.wait_for_selector("[data-listing-id]", timeout=25_000)
+                loaded = True
+                break
+            except Exception as e:
+                if attempt < max_tries:
+                    await page.wait_for_timeout(2500 * attempt)   # back off, then retry
+                elif page_num == 1:
+                    print(f"    (skip after {max_tries} tries: {type(e).__name__})")
+        if not loaded:
             break
 
         # On page 1, read the total result count to know if we need more pages
@@ -166,20 +234,25 @@ async def _extract_card(card):
     title = (await link.inner_text()).strip()
     title = re.sub(r"^(Used|Certified( Pre-Owned)?)\s+", "", title)
 
-    # Primary: structured JSON in data-vehicle-details attribute
-    details = {}
+    # Primary: structured JSON in data-vehicle-details attribute.
+    # Cards WITHOUT this attribute are the page's "similar / shop nationwide"
+    # modules — they carry no seller zip, so out-of-region cars (e.g. NJ, Phoenix)
+    # leak past the LA-area filter. Require the structured blob and skip the rest.
     raw_details = await card.get_attribute("data-vehicle-details") or ""
-    if raw_details:
-        try:
-            details = json.loads(raw_details)
-        except Exception:
-            pass
+    if not raw_details:
+        return None
+    try:
+        details = json.loads(raw_details)
+    except Exception:
+        return None
 
     price      = int(details["price"])   if details.get("price")   else None
     miles      = int(details["mileage"]) if details.get("mileage") else None
     ext_color  = (details.get("exteriorColor") or "").lower()
     vin        = details.get("vin", "")
     seller_zip = str((details.get("seller") or {}).get("zip", "") or "")
+    pt = details.get("primaryThumbnail")
+    image = pt if isinstance(pt, str) else ((pt or {}).get("src") or (pt or {}).get("url") or "") if isinstance(pt, dict) else ""
 
     # Fallback: parse innerText for price/miles/city when card JSON is missing them
     text  = await card.inner_text()
@@ -216,6 +289,7 @@ async def _extract_card(card):
         "interior": "",
         "vin": vin,
         "seller_zip": seller_zip,
+        "image": image,
         "verified": bool(vin),  # VIN from card JSON is sufficient
     }
 
@@ -227,16 +301,18 @@ _CLOUDFLARE_MARKERS = ("just a moment", "checking your browser", "challenge-plat
 # into the 935xx block (Palmdale/Lancaster) while the 933xx and 934xx blocks
 # in between are Bakersfield/Visalia (too far).
 #
-# Covers: LA County (900-919), Inland Empire/Riverside (917-925),
+# Covers: LA County (900-918), Inland Empire/San Bernardino/Riverside (923-925),
 #         Orange County (926-928), Ventura County (930-931),
 #         Palmdale/Lancaster LA County (935).
-# Excludes: 929 (Palm Springs ~100mi), 932 (Central Coast >100mi),
-#            933/934 (Bakersfield/Visalia), 936+ (Fresno/Central Valley),
+# Excludes: 919/920/921 (SAN DIEGO County, ~115mi — these wrongly leaked in
+#            National-City/Chula-Vista cars on 2026-06-12), 922 (Coachella/Palm
+#            Springs ~115mi), 929 (Palm Springs), 932 (Central Coast),
+#            933/934 (Bakersfield/Visalia), 936+ (Central Valley),
 #            940+ (Bay Area/Northern CA), and all non-CA zips.
 _LA_AREA_ZIP_PREFIXES = frozenset({
     "900","901","902","903","904","905","906","907","908","909",
-    "910","911","912","913","914","915","916","917","918","919",
-    "920","921","922","923","924","925","926","927","928",
+    "910","911","912","913","914","915","916","917","918",
+    "923","924","925","926","927","928",
     "930","931",
     "935",  # Palmdale / Lancaster (LA County, ~60mi from downtown)
 })
@@ -313,6 +389,19 @@ async def _fetch_detail(page, listing):
                 listing["ext_color"] = pl.split(":")[-1].strip()
             if "interior" in pl and not listing["interior"]:
                 listing["interior"] = pl.split(":")[-1].strip()
+
+        # Current Cars.com renders basics as SUFFIX-labeled lines, e.g.
+        # "Silver Sky Metallic exterior color" / "Black interior color" — the
+        # selectors above don't catch that, so parse the body text directly.
+        body_text = await page.evaluate("() => document.body.innerText")
+        if not listing["interior"]:
+            m = re.search(r"([^\n]+?)\s+interior color", body_text, re.I)
+            if m:
+                listing["interior"] = m.group(1).strip().lower()
+        if not listing["ext_color"]:
+            m = re.search(r"([^\n]+?)\s+exterior color", body_text, re.I)
+            if m:
+                listing["ext_color"] = m.group(1).strip().lower()
 
         # HTML regex fallback for color if still missing after LD+JSON + CSS
         if not listing["ext_color"]:
@@ -498,20 +587,29 @@ def _select_incremental(listings, top_n=5, brand_penalty=0.12):
 # CarMax / Carvana → scrape.py listing format
 # ---------------------------------------------------------------------------
 
+def _safe_scrape(label, fn):
+    """Run a browser scraper; on ANY failure (e.g. a zendriver websocket drop)
+    log it and return [] so one flaky source never aborts the whole pipeline."""
+    try:
+        return fn()
+    except Exception as e:
+        print(f"[scrape]   {label} FAILED ({type(e).__name__}: {e}); continuing without it")
+        return []
+
+
 def _ingest_browser_sources():
-    """Run CarMax + Carvana sync scrapers and return listings in scrape.py format."""
+    """Run CarMax + Carvana sync scrapers and return listings in scrape.py format.
+    Each source is isolated: a crash in one yields [] and the other still runs."""
     print("[scrape] CarMax …")
-    cm = scrape_carmax(zip_code="90012", radius=75,
-                       year_min=YEAR_MIN, price_min=PRICE_MIN,
-                       price_max=PRICE_MAX, miles_max=MILES_MAX,
-                       wait_secs=6)
+    cm = _safe_scrape("CarMax", lambda: scrape_carmax(
+        zip_code="90012", radius=75, year_min=YEAR_MIN, price_min=PRICE_MIN,
+        price_max=PRICE_MAX, miles_max=MILES_MAX, wait_secs=6))
     print(f"[scrape]   {len(cm)} raw CarMax")
 
     print("[scrape] Carvana …")
-    cv = scrape_carvana(zip_code="90012",
-                        year_min=YEAR_MIN, price_min=PRICE_MIN,
-                        price_max=PRICE_MAX, miles_max=MILES_MAX,
-                        wait_secs=6)
+    cv = _safe_scrape("Carvana", lambda: scrape_carvana(
+        zip_code="90012", year_min=YEAR_MIN, price_min=PRICE_MIN,
+        price_max=PRICE_MAX, miles_max=MILES_MAX, wait_secs=6))
     print(f"[scrape]   {len(cv)} raw Carvana")
 
     out = []
@@ -519,9 +617,9 @@ def _ingest_browser_sources():
         color = c.get("color", "")
         if not is_silver(color):
             continue
+        # Black interiors are KEPT here — scrape.py's Step 6 partitions them into the
+        # message's "relaxed interior" section rather than dropping them.
         interior = c.get("interior", "")
-        if not has_acceptable_interior(interior):
-            continue
 
         # Re-parse model/trim from the listing title — the title is the most
         # reliable source across all providers. Carvana's LD+JSON trim field is
@@ -582,9 +680,8 @@ def _ingest_browser_sources():
 # Main pipeline
 # ---------------------------------------------------------------------------
 
-async def run(dry_run=False, out_file=None, browser_listings=None):
+async def run(dry_run=False, out_file=None, no_browser=False):
     import time as _time
-    browser_listings = browser_listings or []
     all_urls = list(search_urls())
     # Prioritise the highest-value models; cap total to avoid runaway runtimes
     urls = all_urls[:MAX_SEARCH_URLS]
@@ -592,28 +689,61 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
 
     deadline = _time.time() + CARS_COM_DEADLINE_SECS
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=False,  # Cloudflare/Akamai block headless
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        _hide_chromium()
-        ctx = await browser.new_context(
-            user_agent=_UA,
-            viewport={"width": 1280, "height": 800},
-            locale="en-US",
-        )
-        page = await ctx.new_page()
-        await _Stealth().apply_stealth_async(page)
+    # Kick off CarMax + Carvana NOW so they scrape CONCURRENTLY with Cars.com.
+    # Each source fans out to its own headless workers (see browser_scraper); this
+    # runs in a worker thread because those scrapers drive their own event loops.
+    if no_browser:
+        print("[scrape] --no-browser: Cars.com only")
 
-        # -- Step 1: collect raw listings --
+    CDP_URL = os.environ.get("SCRAPE_CDP_URL", "http://localhost:9334")
+    # Ensure the invisible real-Chrome engine is up (Cars.com needs it; see helper).
+    await asyncio.to_thread(_ensure_cdp_engine, CDP_URL)
+    async with async_playwright() as pw:
+        connected = False
+        try:
+            # Drive the already-running invisible engine — nothing renders locally.
+            browser = await pw.chromium.connect_over_cdp(CDP_URL)
+            ctx = browser.contexts[0] if browser.contexts else await browser.new_context()
+            connected = True
+            print(f"[scrape] driving invisible CDP engine at {CDP_URL}")
+        except Exception as e:
+            # No engine up — launch headless (Cars.com renders fine headless, stays invisible).
+            print(f"[scrape] no CDP engine ({type(e).__name__}); launching headless Chromium")
+            browser = await pw.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            ctx = await browser.new_context(
+                user_agent=_UA,
+                viewport={"width": 1280, "height": 800},
+                locale="en-US",
+            )
+        # Pool of N stealth pages → search + detail fetches run concurrently.
+        pages = []
+        for _ in range(CARS_COM_CONCURRENCY):
+            p = await ctx.new_page()
+            await _Stealth().apply_stealth_async(p)
+            pages.append(p)
+
+        # -- Step 1: collect raw listings (N workers, round-robin over URLs) --
+        async def _search_worker(page, url_chunk, start_delay):
+            await asyncio.sleep(start_delay)   # desync workers so all N don't hit Cloudflare at once
+            out = []
+            for url in url_chunk:
+                if _time.time() > deadline:
+                    break
+                slug = url[url.find('models'):url.find('models') + 30]
+                print(f"  search: {slug or url[:50]}...")
+                out.extend(await _fetch_search_page(page, url))
+            return out
+
+        url_chunks = [urls[i::CARS_COM_CONCURRENCY] for i in range(CARS_COM_CONCURRENCY)]
+        worker_out = await asyncio.gather(
+            *[_search_worker(pages[i], url_chunks[i], i * 1.5)
+              for i in range(CARS_COM_CONCURRENCY)])
         raw, seen = [], set()
-        for i, url in enumerate(urls, 1):
-            if _time.time() > deadline:
-                print(f"[scrape] deadline hit after {i-1} URLs — moving on")
-                break
-            print(f"  [{i}/{len(urls)}] {url[url.find('models'):url.find('models')+30] or url[:60]}...")
-            for lst in await _fetch_search_page(page, url):
+        for chunk in worker_out:
+            for lst in chunk:
                 if lst["url"] not in seen:
                     seen.add(lst["url"])
                     raw.append(lst)
@@ -646,48 +776,64 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
             candidates.append(lst)
         print(f"[scrape] {len(candidates)} after basic filters")
 
-        # -- Step 3: detail pages — only for listings missing VIN from card data.
-        # Cards with VIN already have ext_color from data-vehicle-details; detail pages
-        # are Cloudflare-blocked for Cars.com anyway, so skip them when not needed.
-        needs_detail = [lst for lst in candidates if not lst.get("vin")]
-        has_card_vin = [lst for lst in candidates if lst.get("vin")]
-        print(f"[scrape] {len(has_card_vin)} have VIN from card, {len(needs_detail)} need detail fetch")
-        for i, lst in enumerate(needs_detail, 1):
-            if _time.time() > deadline:
-                print(f"[scrape] deadline hit during detail phase — skipping remaining")
-                break
-            print(f"  detail [{i}/{len(needs_detail)}] {lst['title'][:60]}")
-            await _fetch_detail(page, lst)
-            if lst.get("gone"):
-                print("    -> sold (detail page)")
-                continue
-            if lst["ext_color"] and not is_silver(lst["ext_color"]):
-                lst["color_fail"] = True
-            if lst["interior"] and not has_acceptable_interior(lst["interior"]):
-                lst["interior_fail"] = True
-            leather_result = confirms_leather(lst.get("interior", ""))
-            if leather_result is False:
-                lst["leather_fail"] = True
+        # -- Step 3: detail pages for ALL candidates — the card JSON has VIN +
+        # exterior color but NOT interior color, and the buyer's "non-black
+        # interior" rule is a HARD requirement. Detail pages load fine via the
+        # CDP engine, so confirm interior (+ sold-check) on every candidate.
+        print(f"[scrape] confirming interior + availability on {len(candidates)} candidates")
 
-        # Interior check for card-VIN listings (interior is empty — pass through;
-        # trim-spec leather check already applied in step 2)
-        for lst in has_card_vin:
-            if lst["interior"] and not has_acceptable_interior(lst["interior"]):
-                lst["interior_fail"] = True
+        async def _detail_worker(page, cand_chunk):
+            for lst in cand_chunk:
+                if _time.time() > deadline:
+                    break
+                await _fetch_detail(page, lst)
+                if lst.get("gone"):
+                    print(f"    -> sold: {lst['title'][:50]}")
+                    continue
+                if lst["ext_color"] and not is_silver(lst["ext_color"]):
+                    lst["color_fail"] = True
+                # NOTE: black interiors are NOT dropped — they're kept and surfaced in
+                # the message's "relaxed interior" section (Step 6 partitions by interior).
+                if confirms_leather(lst.get("interior", "")) is False:
+                    lst["leather_fail"] = True
+
+        cand_chunks = [candidates[i::CARS_COM_CONCURRENCY] for i in range(CARS_COM_CONCURRENCY)]
+        await asyncio.gather(
+            *[_detail_worker(pages[i], cand_chunks[i]) for i in range(CARS_COM_CONCURRENCY)])
 
         finalists = [
             lst for lst in candidates
             if not lst.get("gone")
             and not lst.get("color_fail")
-            and not lst.get("interior_fail")
             and not lst.get("leather_fail")
         ]
         print(f"[scrape] {len(finalists)} finalists after detail checks")
 
-        await browser.close()
+        for p in pages:
+            try:
+                await p.close()
+            except Exception:
+                pass
+        if not connected:
+            await browser.close()   # never close a CDP-connected engine (would kill it)
 
     verified = [lst for lst in finalists if lst.get("verified")]
     print(f"[scrape] {len(verified)} Cars.com verified / {len(finalists) - len(verified)} dropped")
+
+    # Run CarMax + Carvana AFTER Cars.com finishes — NOT concurrently. Sharing the
+    # machine with the heavy paginated Carvana scrape (Jeep 4xe alone walks ~1,400
+    # listings) was starving Cars.com's page loads → Cloudflare timeouts. Cars.com
+    # now gets the machine to itself first; total wall-clock is ~unchanged since
+    # Carvana is the long pole either way.
+    if no_browser:
+        browser_listings = []
+    else:
+        print("[scrape] Cars.com done — now CarMax + Carvana")
+        try:
+            browser_listings = await asyncio.to_thread(_ingest_browser_sources)
+        except Exception as e:
+            print(f"[scrape] browser sources failed ({type(e).__name__}); Cars.com only")
+            browser_listings = []
 
     # -- Step 5: merge CarMax + Carvana (already verified from live pages) --
     seen_vins = {lst["vin"] for lst in verified if lst.get("vin")}
@@ -699,15 +845,45 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
         verified.append(blst)
     print(f"[scrape] {len(verified)} total after merging CarMax+Carvana")
 
-    # -- Step 6: split into two price buckets, top 5 each --
-    under30 = [l for l in verified if (l.get("price") or 0) <  30_000]
-    over30  = [l for l in verified if (l.get("price") or 0) >= 30_000]
-    top_under = _select_incremental(under30, top_n=5)
-    top_over  = _select_incremental(over30,  top_n=5)
-    top = top_under + top_over
-    print(f"[scrape] {len(top_under)} under $30k / {len(top_over)} $30-40k")
+    # -- Step 6: partition by interior, then select --
+    # Section 1 (strict) = the buyer's full filters incl. non-black interior.
+    # Section 2 (relaxed) = SAME filters but interior color relaxed → the extra cars
+    # that have a (known) BLACK interior. Unknown-interior cars count as non-black.
+    strict = [l for l in verified if has_acceptable_interior(l.get("interior", ""))]
+    relaxed_extra = [l for l in verified if not has_acceptable_interior(l.get("interior", ""))]
 
-    # -- Step 7: send / output --
+    under30 = [l for l in strict if (l.get("price") or 0) <  30_000]
+    over30  = [l for l in strict if (l.get("price") or 0) >= 30_000]
+    top_under   = _select_incremental(under30, top_n=5)
+    top_over    = _select_incremental(over30,  top_n=5)
+    top_relaxed = _select_incremental(relaxed_extra, top_n=5)
+    top = top_under + top_over + top_relaxed
+    print(f"[scrape] strict: {len(top_under)} under / {len(top_over)} over $30k; "
+          f"relaxed-interior extra: {len(top_relaxed)}")
+
+    # -- Structured log for autonomous spot-checking (images, diversity, anomalies) --
+    def _slim(l):
+        return {"title": l.get("title"), "price": l.get("price"), "miles": l.get("miles"),
+                "ext_color": l.get("ext_color"), "interior": l.get("interior"),
+                "city": l.get("city"), "dealer": l.get("dealer"), "seller_zip": l.get("seller_zip"),
+                "vin": l.get("vin"), "source": l.get("source", "cars.com"),
+                "image": l.get("image", ""), "url": l.get("url")}
+    makes = {}
+    for l in top:
+        makes[_make(l)] = makes.get(_make(l), 0) + 1
+    log = {
+        "counts": {"verified": len(verified), "strict": len(strict),
+                   "relaxed_extra": len(relaxed_extra), "selected": len(top)},
+        "make_distribution": makes,
+        "selected_strict": [_slim(l) for l in top_under + top_over],
+        "selected_relaxed": [_slim(l) for l in top_relaxed],
+        "all_verified": [_slim(l) for l in verified],
+    }
+    with open("/tmp/scrape_log.json", "w") as f:
+        json.dump(log, f, indent=2)
+    print(f"[scrape] log -> /tmp/scrape_log.json | make distribution: {makes}")
+
+    # -- Step 7: build the two-section message / output --
     def _brief(lst, i):
         miles_str = f"{lst['miles'] // 1000}k mi" if lst.get("miles") else "? mi"
         price_str = lst.get("price_text") or f"${lst['price']:,}"
@@ -716,40 +892,47 @@ async def run(dry_run=False, out_file=None, browser_listings=None):
         title = lst["title"].replace("Used ", "").replace("Certified ", "")
         return f'{i}. {title} — {price_str} | {miles_str}{color_part} — <a href="{lst["url"]}">view</a>'
 
-    def _build_msg(top_under, top_over):
-        lines = []
+    def _build_msg():
+        lines = ["<b>Silver/gray leather hybrids, 2021+, &lt;50k mi, $20–40k</b>",
+                 "<b>Your filters (non-black interior):</b>"]
         if top_under:
             lines.append("Under $30k:")
-            lines += [_brief(lst, i) for i, lst in enumerate(top_under, 1)]
+            lines += [_brief(l, i) for i, l in enumerate(top_under, 1)]
         if top_over:
-            if top_under:
-                lines.append("")
             lines.append("$30–40k:")
-            lines += [_brief(lst, i) for i, lst in enumerate(top_over, 1)]
+            lines += [_brief(l, i) for i, l in enumerate(top_over, 1)]
+        if not (top_under or top_over):
+            lines.append("(no matches right now)")
+        if top_relaxed:
+            lines.append("")
+            lines.append("<b>Relaxing interior color (black interior also OK):</b>")
+            lines += [_brief(l, i) for i, l in enumerate(top_relaxed, 1)]
         return "\n".join(lines)
 
     if out_file:
-        rows = [{"title": l["title"], "price": l.get("price_text",""), "miles": f"{l['miles']//1000}k mi",
-                 "url": l["url"], "vin": l.get("vin",""), "verified": True} for l in top]
+        rows = [{"title": l["title"], "price": l.get("price_text", ""),
+                 "miles": f"{(l.get('miles') or 0)//1000}k mi", "url": l["url"],
+                 "vin": l.get("vin", ""), "verified": True,
+                 "section": "relaxed" if l in top_relaxed else "strict"} for l in top]
         with open(out_file, "w") as f:
             json.dump(rows, f, indent=2)
         print(f"[scrape] wrote {len(rows)} listings → {out_file}")
     elif dry_run:
-        print(f"\nDry run:")
-        print(_build_msg(top_under, top_over))
+        print("\nDry run:")
+        print(_build_msg())
     else:
         from config import telegram_conf
-        import requests, html as _html
+        import requests
         tok, chat = telegram_conf()
-        msg = _build_msg(top_under, top_over)
         r = requests.get(
             f"https://api.telegram.org/bot{tok}/sendMessage",
-            params={"chat_id": chat, "text": msg, "parse_mode": "HTML",
+            params={"chat_id": chat, "text": _build_msg(), "parse_mode": "HTML",
                     "disable_web_page_preview": "true"},
             timeout=30,
         )
         r.raise_for_status()
-        print(f"[scrape] sent {len(top)} listings to Telegram")
+        print(f"[scrape] sent {len(top)} listings to Telegram "
+              f"({len(top_under)+len(top_over)} strict + {len(top_relaxed)} relaxed)")
 
 
 def main():
@@ -758,10 +941,9 @@ def main():
     if "--out" in sys.argv:
         idx = sys.argv.index("--out")
         out_file = sys.argv[idx + 1]
-    # Run sync scrapers before the asyncio event loop starts
-    browser_listings = _ingest_browser_sources()
-    asyncio.run(run(dry_run=dry_run, out_file=out_file,
-                    browser_listings=browser_listings))
+    # Cars.com is the verified main path; --no-browser skips CarMax/Carvana.
+    no_browser = "--no-browser" in sys.argv
+    asyncio.run(run(dry_run=dry_run, out_file=out_file, no_browser=no_browser))
 
 
 if __name__ == "__main__":
