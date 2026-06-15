@@ -211,14 +211,22 @@ No persistent database. State is ephemeral:
    `+0.12` per already-picked same-brand car, `+0.12` more if same brand **and** model. 3. A great
    same-brand car still wins if proportionally better — a nudge, not a cap.
 
-**CarMax / Carvana — `browser_scraper.py` (zendriver headless)**
+**Carvana — `browser_scraper.py` (zendriver headless, FILTER-FIRST)**
 
-1. `zendriver.start(headless=True)` (system Chrome, `--headless=new`, fresh profile — no window).
-2. Navigate the search URL; `_clear_cloudflare` (Carvana): try `tab.verify_cf()`, else wait + reload
-   until the "Just a moment" interstitial clears. 3. Scroll until LD+JSON count is stable; extract all
-   `script[type="application/ld+json"]` via `page.evaluate(return_by_value=True)`. 4. Parse `@type` Car/
-   Vehicle blocks into the common listing dict (VIN/price/color/interior/trim/url). Carvana loops one
-   URL per `MODELS` entry, reusing one tab.
+1. `zendriver.start(headless=True)` (system Chrome, `--headless=new`, no window).
+2. **No make/model loop.** Build NO-MAKE `/cars/filters?...&cvnaid=<base64>` URLs whose blob filters
+   server-side: `bodyStyles=[suv]` + `fuelTypes=[Hybrid, Plug-In Hybrid]` + `colors=[Silver, Gray]` +
+   `interiorColors` + `cvnaFeatures` (leather). The leather features are AND-combined, so we run 4
+   concurrent queries = {non-black, black} interior × {Genuine, Synthetic} leather (one tab each).
+3. Each query: `_clear_cloudflare` (verify_cf / wait+reload), paginate `&page=N` until no new VINs,
+   extract `@type=Car|Vehicle` LD+JSON. Tag interior (non-black→"", black→"Black") and `leather_ok=True`.
+4. Returns every qualifying car across ALL makes (Mazda CX-90 PHEV, Dodge Hornet, Audi Q5, …). Local
+   side (scrape.py `_ingest_browser_sources`) blacklists Jeep/Kia, trusts `leather_ok` (skips the trim
+   gate), and the scoring fn ranks all → top 10 strict + top 10 relaxed.
+
+**CarMax — `browser_scraper.py`** (zendriver headless): still per-search; headless only yields a static
+22-car carousel (Akamai-API-gated grid never fires), so it contributes ~nothing. Leather verified from
+its LD+JSON `vehicleInteriorType` since it has no server leather filter.
 
 ---
 
@@ -402,3 +410,11 @@ focus-steal on 2026-06-11.)
   sequenced Cars.com first (retries+stagger also added). Telegram message now has **two sections**:
   (1) full filters (non-black interior), (2) same but interior color relaxed (black OK). Fixed Ford
   Escape (base slug + parser + Carbonized-Gray veto). Removed Nissan Rogue/Murano (no US hybrid).
+- **2026-06-14** — **FILTER-FIRST refactor (cross-make).** Replaced Carvana's per-model loop with NO-MAKE
+  cvnaid queries filtering body=SUV + fuel=Hybrid/Plug-In Hybrid + color=Silver/Gray + interior + leather
+  (`cvnaFeatures`, genuine OR synthetic — AND-combined so 4 queries) ALL server-side. Surfaces every
+  qualifying car across all makes (Mazda CX-90 PHEV, Dodge Hornet, Audi Q5, Lexus UX…) instead of a
+  curated 13-model list — this is what was hiding cars like the Ford Escape. Leather enforced via the
+  feature tag (tradeoff vs the buyer's old trim-spec preference, required to span all makes). Local:
+  make blacklist (Jeep, Kia); scoring fn ranks everything → **top 10 strict + top 10 relaxed**. Cars.com
+  filter-first refactor is next (still model-by-model).
