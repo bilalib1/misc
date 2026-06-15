@@ -205,6 +205,9 @@ def crossmake_search_url(color_slug: str) -> str:
     params = [
         ("stock_type", "used"),
         ("body_style_slugs[]", "suv"),
+        ("clean_title", "true"),   # exclude salvage/rebuilt/branded titles server-side
+                                   # (Cars.com is the only of our 3 sources that lists them;
+                                   #  Carvana/CarMax are clean-title by policy)
         ("list_price_min", PRICE_MIN),
         ("list_price_max", PRICE_MAX),
         ("mileage_max", MILES_MAX),
