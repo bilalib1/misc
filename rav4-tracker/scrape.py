@@ -33,7 +33,7 @@ import car_search as _cs
 from car_search import (
     YEAR_MIN, PRICE_MIN, PRICE_MAX, MILES_MAX,
     is_silver, has_acceptable_interior, has_leather, confirms_leather,
-    is_blocked_model,
+    is_blocked_model, is_blocked_make,
     MANUFACTURER_MULTIPLIER, trim_score_multiplier,
     search_urls,
     UNVERIFIABLE_SELLERS, SOLD_MARKERS,
@@ -201,12 +201,15 @@ async def _fetch_search_page(page, url):
                 listings.append(lst)
                 new_this_page += 1
 
-        # Stop if: no new results, fewer than PAGE_SIZE (last page), or we have everything
+        # Stop when a page yields no NEW listings (the previous "< PAGE_SIZE = last
+        # page" heuristic broke on the filter-first results, where ~half the cards are
+        # sponsored/nationwide with no data-vehicle-details, so new_this_page is always
+        # well under PAGE_SIZE). Walk pages until empty, capped for safety.
         if new_this_page == 0:
             break
-        if new_this_page < PAGE_SIZE:
-            break
         if total and len(listings) >= total:
+            break
+        if page_num >= 8:
             break
         page_num += 1
 
@@ -245,6 +248,15 @@ async def _extract_card(card):
         details = json.loads(raw_details)
     except Exception:
         return None
+
+    # Build the title from the structured JSON (always present). The visible link
+    # text lazy-loads and is often EMPTY on the filter-first results page, which was
+    # dropping real cars; year/make/model/trim in the JSON is reliable.
+    j_title = " ".join(str(details.get(k) or "").strip()
+                       for k in ("year", "make", "model", "trim")).strip()
+    j_title = re.sub(r"\s+", " ", j_title)
+    if j_title:
+        title = j_title
 
     price      = int(details["price"])   if details.get("price")   else None
     miles      = int(details["mileage"]) if details.get("mileage") else None
@@ -755,6 +767,10 @@ async def run(dry_run=False, out_file=None, no_browser=False):
                 continue
             if not _is_la_area_zip(lst.get("seller_zip", "")):
                 print(f"    (skip out-of-area zip {lst.get('seller_zip')} — {lst['title'][:50]})")
+                continue
+            parts = lst["title"].split()
+            make = parts[1].lower() if len(parts) > 1 else ""
+            if is_blocked_make(make):   # Jeep / Kia
                 continue
             model, trim = _parse_model_trim(lst["title"])
             if not model:

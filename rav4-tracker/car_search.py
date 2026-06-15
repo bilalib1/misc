@@ -196,11 +196,14 @@ def confirms_leather(interior_text: str):
     return None
 
 
-def build_search_url(make: str, model_slug: str, color_slug: str) -> str:
+def crossmake_search_url(color_slug: str) -> str:
+    """FILTER-FIRST Cars.com URL: body=SUV + fuel=hybrid/PHEV + one exterior color,
+    NO make/model. Returns every SUV hybrid/PHEV in greater LA of that color; model
+    recognition + leather-by-trim are applied locally afterward (Cars.com has no
+    working server-side leather filter, and is LA-local so the result set is small)."""
     params = [
         ("stock_type", "used"),
-        ("makes[]", make),
-        ("models[]", model_slug),
+        ("body_style_slugs[]", "suv"),
         ("list_price_min", PRICE_MIN),
         ("list_price_max", PRICE_MAX),
         ("mileage_max", MILES_MAX),
@@ -211,16 +214,16 @@ def build_search_url(make: str, model_slug: str, color_slug: str) -> str:
         ("fuel_slugs[]", "plug_in_hybrid"),
         ("zip", ZIP),
         ("maximum_distance", DISTANCE),
-        ("page_size", 50),
+        ("page_size", 100),
         ("sort", "list_price_asc"),
     ]
     return "https://www.cars.com/shopping/results/?" + urlencode(params)
 
 
 def search_urls():
-    for make, model_slug in MODELS:
-        for color in COLOR_SLUGS:
-            yield build_search_url(make, model_slug, color)
+    """One filter-first URL per exterior color (silver, gray) — no per-model loop."""
+    for color in COLOR_SLUGS:
+        yield crossmake_search_url(color)
 
 
 # ---------------------------------------------------------------------------
