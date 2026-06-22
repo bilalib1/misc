@@ -8,7 +8,7 @@ One paragraph: the problem, why it matters, what this plan changes. Replace in e
 
 **Repo layout:** `~/code` holds all repos, one directory per repo (this template lives in `~/code/misc`). Plans reference paths relative to their own repo root.
 
-Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**` line. Every section below besdies its meta-description **stays in every fork**.
+Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. All section headers stay in every fork. **Copy §1–§3 verbatim — they are project-independent working agreements; rewrite the title, intro paragraph, and §4 onward for the specific project**, replacing each italic meta-description with real content.
 
 1. How To Use This Template
 2. Maintain This Plan
@@ -65,6 +65,8 @@ Fork into `plans/YYYY-MM-DD-<slug>.md`, one per task. Keep the `**Forked from:**
 - Delegate all long-running tasks to subagents so as to keep main chat unblocked.
 
 ---
+
+> **▲ Copy §1–§3 above verbatim on fork. ▼ Write everything below fresh for this project.**
 
 ## 4. Context & Problem Statement
 
