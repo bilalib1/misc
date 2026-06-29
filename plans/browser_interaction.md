@@ -96,6 +96,8 @@ Run any verb as `cd src/browser_interaction && python3 -m browser_interaction <v
 | `upload_files_via_file_chooser.py` | `upload_files_via_file_chooser` | Upload via intercepted file chooser (`DOM.setFileInputFiles`). **Needs a composited/visible window** — Google's *New* menu won't open headless/hidden, so prefer `upload` above. |
 | `write_google_sheet_cell.py` | `setcell` | Write one Sheets cell over CDP: anchor on the Name Box (`#t-name-box`), then real key events. Canvas-safe, headless. |
 | `read_ld_json.py` | `ldjson`, `cars` | Headless listing scraper: open a bg tab, hydrate + scroll, return `<script type=ld+json>` records. Playwright-free → no `Runtime.enable` tell. |
+| `fetch_json_in_page.py` | `fetchjson`, `fetch_json` | Call a site's **internal JSON API from inside a loaded same-origin tab** (`fetch(..., credentials:'include')`) so it inherits cookies/TLS/anti-bot context — a bare `requests` call is blocked. Drives the logged-in invisible Chrome. (KBB LSC pattern, generalized.) |
+| `zendriver_session.py` | `zenldjson`, `zenapi` (+ `start_browser`, `clear_cloudflare`, `set_cookies`, `read_ld_json`, `car_blocks`, `fetch_json_in_page`) | **Hardened anti-bot path, fully headless** via `zendriver` (own throwaway browser, not the logged-in Chrome). Centralizes the CarMax/Carvana/KBB techniques: start headless, detect+clear Cloudflare, pin geo/session cookies before load, read LD+JSON (`@graph`-aware), in-page API fetch. The generic home for what used to live only in car-sales-scraping. |
 
 ## Lessons baked in
 
@@ -112,6 +114,9 @@ Run any verb as `cd src/browser_interaction && python3 -m browser_interaction <v
   fast event (e.g. `Page.fileChooserOpened`) fired mid-call isn't dropped before `wait_for_event`.
 - Read backgrounded tabs with `textContent` (innerText is empty when a tab isn't painted) — moot under CDP, but relevant for the AppleScript fallback.
 - **Never call `Runtime.enable`** — it's the main automation tell on anti-bot sites. Bare `Runtime.evaluate` is enough and is invisible to that check.
+- **Private JSON APIs: fetch from INSIDE the page, not with `requests`.** Many SPAs (KBB `/rest/lsc/listing`) fill their grid from a JSON endpoint that rejects a bare external request (no cookies/TLS/Origin). Load a same-origin page first, then `fetch(url, {credentials:'include'})` via `Runtime.evaluate` — it inherits the page's full context and returns data. `fetch_json_in_page.py` (logged-in Chrome) / `zendriver_session.fetch_json_in_page` (hardened sites, after `clear_cloudflare`).
+- **Server-side output can hinge on a cookie** — pin it BEFORE loading (`set_cookies`): e.g. Carvana derives each car's shipping fee + delivery days from `CVCurrentZip/City/State`, so pinning your location turns "shipped from afar" into a clean local/non-local filter signal. Set at the CDP layer *and* via `document.cookie` on a warm-up page.
+- **Cloudflare interstitials clear headless** (`clear_cloudflare`): the common "Just a moment…" JS challenge auto-clears on a short wait/reload; the rare interactive Turnstile is solved by zendriver's `verify_cf()` (short timeout — fail fast, the checkbox is uncommon).
 
 ## Proven on
 
@@ -157,4 +162,7 @@ Carvana). Never reach for a headed browser — it is not invisible on macOS and 
 - `download_gmail_message_pdf.py` — generalize the grab-body-HTML → print-to-PDF receipt flow.
 - ~~Port `browser_scraper.py` off Playwright onto `zendriver`.~~ **Done** — CarMax + Carvana now
   scrape fully headless via `zendriver` (2026-06-14).
+- ~~Generalize the car-repo zendriver + in-page-API techniques into reusable helpers here.~~ **Done
+  (2026-06-29)** — `zendriver_session.py` (headless start, `clear_cloudflare`, `set_cookies`, LD+JSON,
+  in-page fetch) and `fetch_json_in_page.py` (logged-in Chrome same-origin JSON-API fetch).
 - Teardown helper for the `Chrome-CDP` profile (currently `~/Library/.../Chrome-CDP`).
