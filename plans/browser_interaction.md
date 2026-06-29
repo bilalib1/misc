@@ -39,7 +39,8 @@ drives Chrome over a bare WebSocket CDP connection with no WebDriver and no Play
   (28/31 vs Cloudflare).
 - Cloudflare interstitials ("Just a moment…") are handled headless: `tab.verify_cf()` solves the
   interactive Turnstile checkbox, plus a wait/reload loop clears the auto-clearing JS challenge.
-- See `rav4-tracker/browser_scraper.py` (`zendriver.start(headless=True)`, `_clear_cloudflare`).
+- These techniques now live as reusable helpers here in `zendriver_session.py` (`start_browser`,
+  `clear_cloudflare`); first proven in `automations/car-sales-scraping/browser_scraper.py`.
 
 ### Banned: headed Chrome (do not reintroduce)
 
@@ -123,9 +124,10 @@ Run any verb as `cd src/browser_interaction && python3 -m browser_interaction <v
 - **Shinkei reimbursement:** read Gmail receipts across 3 accounts, filled the Google Sheet
   (`setcell`), and uploaded the receipt PDFs to the Drive folder. Final upload (Lyft) done **fully
   headless** via drag-drop after confirming the file-chooser menu can't open invisibly.
-- **Car buying (rav4-tracker):** Cars.com / dealer-site listing reads; **CarMax (Akamai) + Carvana
-  (Cloudflare) LD+JSON scraped FULLY HEADLESS** via `zendriver` — `rav4-tracker/browser_scraper.py`
-  (`scrape_carmax`, `scrape_carvana`). Proven live 2026-06-14; no window ever appears.
+- **Car buying (`automations/car-sales-scraping`):** Cars.com / dealer-site listing reads; **CarMax
+  (Akamai) + Carvana (Cloudflare) LD+JSON scraped FULLY HEADLESS** via `zendriver` —
+  `car-sales-scraping/browser_scraper.py` (`scrape_carmax`, `scrape_carvana`), and the KBB/Autotrader
+  JSON API via `kbb_scraper.py`. Proven live 2026-06-14; no window ever appears.
 
 ## Research — current best-in-class (2026-06-11)
 
