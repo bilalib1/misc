@@ -13,8 +13,13 @@ Verbs:
     type   <url_substr> <text> [--enter] type into the focused element
     ldjson <url>                         dump LD+JSON blocks from a page
     cars   <url>                         dump @type=Car/Vehicle LD+JSON records
+    fetchjson <api_url> [on_url_substr]  call a site's internal JSON API via same-origin in-page fetch
     upload <url_substr> <file>...        drag-drop files onto a tab (headless-safe upload)
     setcell <url_substr> <cell> <value>  write one Google Sheets cell (e.g. B9 6/2/2026)
+
+  Hardened anti-bot sites (own throwaway HEADLESS zendriver browser, not the logged-in Chrome):
+    zenldjson <url>                      Cloudflare/Akamai-safe LD+JSON scrape (CarMax/Carvana/dealer)
+    zenapi <api_url> <warmup_url>        clear Cloudflare on warmup_url, then in-page-fetch its JSON API (KBB)
 
 Run from this directory (helpers import each other by bare module name), e.g.:
     cd ~/code/misc/src/browser_interaction && python3 -m browser_interaction tabs
@@ -72,6 +77,15 @@ def main(argv: list[str]) -> int:
     elif verb == "cars":
         from read_ld_json import read_cars
         _print(read_cars(rest[0]))
+    elif verb == "fetchjson":
+        from fetch_json_in_page import fetch_json_in_page
+        _print(fetch_json_in_page(rest[0], on_url=rest[1] if len(rest) > 1 else None))
+    elif verb == "zenldjson":
+        from zendriver_session import scrape_ld_json
+        _print(scrape_ld_json(rest[0]))
+    elif verb == "zenapi":
+        from zendriver_session import fetch_site_api
+        _print(fetch_site_api(rest[0], rest[1]))
     elif verb == "upload":
         from upload_files_via_drag_drop import upload_files_via_drag_drop
         _print(upload_files_via_drag_drop(rest[0], rest[1:]))
